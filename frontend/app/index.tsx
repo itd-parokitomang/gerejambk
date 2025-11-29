@@ -16,28 +16,26 @@ import { Ionicons } from '@expo/vector-icons';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// Calculate number of columns and item width based on screen width
-const getLayoutConfig = (width: number) => {
-  let numColumns = 3; // Default mobile
-  
-  if (width >= 1024) {
-    numColumns = 5; // Desktop
-  } else if (width >= 768) {
-    numColumns = 4; // Tablet
-  }
-  
-  // Calculate item width with margin consideration
-  // Each item has marginHorizontal: 4 (8px total per item)
-  // Grid has marginHorizontal: -4 (to compensate)
-  const horizontalPadding = 24; // 12px each side from menuSection
-  const marginPerItem = 8; // 4px each side
-  const totalMargins = numColumns * marginPerItem;
-  const itemWidth = (width - horizontalPadding - totalMargins) / numColumns;
-  
-  return { numColumns, itemWidth };
+// Calculate number of columns based on screen width
+const getNumColumns = (width: number) => {
+  if (width >= 1024) return 5; // Desktop
+  if (width >= 768) return 4;  // Tablet
+  return 3; // Mobile
 };
 
-const LAYOUT_CONFIG = getLayoutConfig(SCREEN_WIDTH);
+const NUM_COLUMNS = getNumColumns(SCREEN_WIDTH);
+
+// Calculate item width as percentage
+// With 3 columns: 33.33% - margin
+// With 4 columns: 25% - margin
+// With 5 columns: 20% - margin
+const getItemWidth = (numCols: number) => {
+  const marginPercent = 1; // 1% margin on each side
+  const percentage = (100 / numCols) - (marginPercent * 2);
+  return `${percentage}%`;
+};
+
+const ITEM_WIDTH = getItemWidth(NUM_COLUMNS);
 
 // Dummy slider images (base64 placeholders - small colored rectangles)
 const DUMMY_SLIDERS = [
