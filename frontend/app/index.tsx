@@ -228,11 +228,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  swiper: {
+  webSliderWrapper: {
+    height: 220,
+    position: 'relative',
+  },
+  pagerView: {
     height: 220,
   },
   slide: {
-    flex: 1,
+    height: 220,
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 16,
@@ -264,7 +268,10 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   pagination: {
+    position: 'absolute',
     bottom: 12,
+    flexDirection: 'row',
+    alignSelf: 'center',
   },
   menuSection: {
     marginTop: 24,
