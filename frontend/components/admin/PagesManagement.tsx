@@ -484,7 +484,7 @@ export default function PagesManagement() {
               </View>
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
