@@ -1,0 +1,22 @@
+diff --git a/frontend/components/admin/PagesManagement.tsx b/frontend/components/admin/PagesManagement.tsx
+index 54a0a3f..5649ee9 100644
+--- a/frontend/components/admin/PagesManagement.tsx
++++ b/frontend/components/admin/PagesManagement.tsx
+@@ -48,7 +48,9 @@ export default function PagesManagement() {
+     order: 0,
+     active: true,
+     richTextContent: '',
++    youtubeVideos: [],
+   });
++  const richText = useRef<RichEditor>(null);
+ 
+   useEffect(() => {
+     loadPages();
+@@ -76,6 +78,7 @@ export default function PagesManagement() {
+       order: pages.length,
+       active: true,
+       richTextContent: '',
++      youtubeVideos: [],
+     });
+     setShowModal(true);
+   };
