@@ -68,16 +68,14 @@ const MENU_ITEMS = [
 export default function Index() {
   const router = useRouter();
   const [activeSlide, setActiveSlide] = useState(0);
-  const pagerRef = useRef<PagerView>(null);
+  const flatListRef = useRef<FlatList>(null);
 
   // Auto-play slider
   useEffect(() => {
     const interval = setInterval(() => {
       setActiveSlide((prev) => {
         const next = (prev + 1) % DUMMY_SLIDERS.length;
-        if (Platform.OS !== 'web') {
-          pagerRef.current?.setPage(next);
-        }
+        flatListRef.current?.scrollToIndex({ index: next, animated: true });
         return next;
       });
     }, 4000);
@@ -87,6 +85,12 @@ export default function Index() {
   const handleMenuPress = (route: string) => {
     router.push(route);
   };
+
+  const renderSlideItem = ({ item }: { item: typeof DUMMY_SLIDERS[0] }) => (
+    <View style={[styles.slide, { backgroundColor: item.color }]}>
+      <Text style={styles.slideText}>{item.text}</Text>
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -105,52 +109,37 @@ export default function Index() {
 
         {/* Slider Section */}
         <View style={styles.sliderContainer}>
-          {Platform.OS === 'web' ? (
-            // Simple web slider
-            <View style={styles.webSliderWrapper}>
-              <View style={[styles.slide, { backgroundColor: DUMMY_SLIDERS[activeSlide].color }]}>
-                <Text style={styles.slideText}>{DUMMY_SLIDERS[activeSlide].text}</Text>
-              </View>
-              <View style={styles.pagination}>
-                {DUMMY_SLIDERS.map((_, index) => (
-                  <View
-                    key={index}
-                    style={[
-                      styles.dot,
-                      index === activeSlide && styles.activeDot,
-                    ]}
-                  />
-                ))}
-              </View>
-            </View>
-          ) : (
-            // Native slider
-            <>
-              <PagerView
-                ref={pagerRef}
-                style={styles.pagerView}
-                initialPage={0}
-                onPageSelected={(e) => setActiveSlide(e.nativeEvent.position)}
-              >
-                {DUMMY_SLIDERS.map((slide) => (
-                  <View key={slide.id} style={[styles.slide, { backgroundColor: slide.color }]}>
-                    <Text style={styles.slideText}>{slide.text}</Text>
-                  </View>
-                ))}
-              </PagerView>
-              <View style={styles.pagination}>
-                {DUMMY_SLIDERS.map((_, index) => (
-                  <View
-                    key={index}
-                    style={[
-                      styles.dot,
-                      index === activeSlide && styles.activeDot,
-                    ]}
-                  />
-                ))}
-              </View>
-            </>
-          )}
+          <FlatList
+            ref={flatListRef}
+            data={DUMMY_SLIDERS}
+            renderItem={renderSlideItem}
+            keyExtractor={(item) => item.id}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={(event) => {
+              const slideSize = event.nativeEvent.layoutMeasurement.width;
+              const index = Math.round(event.nativeEvent.contentOffset.x / slideSize);
+              setActiveSlide(index);
+            }}
+            getItemLayout={(data, index) => ({
+              length: SCREEN_WIDTH - 32,
+              offset: (SCREEN_WIDTH - 32) * index,
+              index,
+            })}
+            style={styles.flatList}
+          />
+          <View style={styles.pagination}>
+            {DUMMY_SLIDERS.map((_, index) => (
+              <View
+                key={index}
+                style={[
+                  styles.dot,
+                  index === activeSlide && styles.activeDot,
+                ]}
+              />
+            ))}
+          </View>
         </View>
 
         {/* Menu Grid */}
