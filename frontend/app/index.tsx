@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
     marginHorizontal: -4,
   },
   menuItem: {
-    width: LAYOUT_CONFIG.itemWidth,
+    width: ITEM_WIDTH,
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 12,
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: 120,
     marginBottom: 8,
-    marginHorizontal: 4,
+    marginHorizontal: '1%',
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
