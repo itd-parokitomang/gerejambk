@@ -333,15 +333,78 @@ export default function PagesManagement() {
                 {/* Type-specific fields */}
                 {formData.type === 'static' && (
                   <View style={styles.formGroup}>
-                    <Text style={styles.label}>Konten</Text>
-                    <TextInput
-                      style={[styles.input, styles.textarea]}
-                      value={formData.richTextContent}
-                      onChangeText={(text) => setFormData({ ...formData, richTextContent: text })}
-                      placeholder="Masukkan konten halaman..."
-                      multiline
-                      numberOfLines={6}
-                    />
+                    <Text style={styles.label}>Konten Halaman</Text>
+                    <View style={styles.richEditorContainer}>
+                      <RichToolbar
+                        editor={richText}
+                        actions={[
+                          actions.setBold,
+                          actions.setItalic,
+                          actions.setUnderline,
+                          actions.heading1,
+                          actions.heading2,
+                          actions.insertBulletsList,
+                          actions.insertOrderedList,
+                          actions.insertLink,
+                          actions.undo,
+                          actions.redo,
+                        ]}
+                        style={styles.richToolbar}
+                      />
+                      <RichEditor
+                        ref={richText}
+                        initialContentHTML={formData.richTextContent || ''}
+                        onChange={(text) => setFormData({ ...formData, richTextContent: text })}
+                        placeholder="Tulis konten halaman di sini..."
+                        style={styles.richEditor}
+                      />
+                    </View>
+                  </View>
+                )}
+
+                {formData.type === 'youtube_video' && (
+                  <View style={styles.formGroup}>
+                    <View style={styles.videoListHeader}>
+                      <Text style={styles.label}>Daftar Video YouTube</Text>
+                      <TouchableOpacity style={styles.addVideoButton} onPress={handleAddVideo}>
+                        <Ionicons name="add-circle" size={20} color="#8B4513" />
+                        <Text style={styles.addVideoText}>Tambah Video</Text>
+                      </TouchableOpacity>
+                    </View>
+                    {formData.youtubeVideos && formData.youtubeVideos.length > 0 ? (
+                      formData.youtubeVideos.map((video, index) => (
+                        <View key={video.id} style={styles.videoItem}>
+                          <View style={styles.videoItemHeader}>
+                            <Text style={styles.videoItemTitle}>Video {index + 1}</Text>
+                            <TouchableOpacity onPress={() => handleRemoveVideo(video.id)}>
+                              <Ionicons name="trash-outline" size={20} color="#D32F2F" />
+                            </TouchableOpacity>
+                          </View>
+                          <TextInput
+                            style={styles.input}
+                            value={video.title}
+                            onChangeText={(text) => handleVideoChange(video.id, 'title', text)}
+                            placeholder="Judul Video"
+                          />
+                          <TextInput
+                            style={[styles.input, { marginTop: 8 }]}
+                            value={video.videoId}
+                            onChangeText={(text) => handleVideoChange(video.id, 'videoId', text)}
+                            placeholder="Video ID (misal: dQw4w9WgXcQ)"
+                            autoCapitalize="none"
+                          />
+                          <Text style={styles.helperText}>
+                            ID video dari URL: youtube.com/watch?v=<Text style={{ fontWeight: '600' }}>VIDEO_ID</Text>
+                          </Text>
+                        </View>
+                      ))
+                    ) : (
+                      <View style={styles.emptyVideoList}>
+                        <Ionicons name="videocam-outline" size={48} color="#CCC" />
+                        <Text style={styles.emptyVideoText}>Belum ada video</Text>
+                        <Text style={styles.emptyVideoSubtext}>Klik "Tambah Video" untuk menambahkan</Text>
+                      </View>
+                    )}
                   </View>
                 )}
 
