@@ -9,33 +9,11 @@ import {
   Image,
   Platform,
   FlatList,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-// Calculate number of columns based on screen width
-const getNumColumns = (width: number) => {
-  if (width >= 1024) return 5; // Desktop
-  if (width >= 768) return 4;  // Tablet
-  return 3; // Mobile
-};
-
-const NUM_COLUMNS = getNumColumns(SCREEN_WIDTH);
-
-// Calculate item width as percentage
-// With 3 columns: 33.33% - margin
-// With 4 columns: 25% - margin
-// With 5 columns: 20% - margin
-const getItemWidth = (numCols: number) => {
-  const marginPercent = 1; // 1% margin on each side
-  const percentage = (100 / numCols) - (marginPercent * 2);
-  return `${percentage}%`;
-};
-
-const ITEM_WIDTH = getItemWidth(NUM_COLUMNS);
 
 // Dummy slider images (base64 placeholders - small colored rectangles)
 const DUMMY_SLIDERS = [
