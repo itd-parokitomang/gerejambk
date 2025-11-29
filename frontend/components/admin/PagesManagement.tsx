@@ -48,7 +48,9 @@ export default function PagesManagement() {
     order: 0,
     active: true,
     richTextContent: '',
+    youtubeVideos: [],
   });
+  const richText = useRef<RichEditor>(null);
 
   useEffect(() => {
     loadPages();
