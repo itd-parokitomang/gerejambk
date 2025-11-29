@@ -1,72 +1,74 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
-import Constants from 'expo-constants';
-
-const BACKEND_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_BACKEND_URL || process.env.EXPO_PUBLIC_BACKEND_URL || '';
-const API_URL = `${BACKEND_URL}/api`;
-
-interface User {
-  email: string;
-  role: string;
-}
+import { User } from 'firebase/auth';
+import { 
+  loginUser, 
+  logoutUser, 
+  onAuthChange,
+  getCurrentUserProfile,
+  seedSuperAdmin
+} from '../services/auth.service';
+import { initializeDefaultSettings } from '../services/settings.service';
+import { UserProfile } from '../services/auth.service';
 
 interface AuthContextType {
   user: User | null;
+  profile: UserProfile | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  checkAuth: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const checkAuth = async () => {
-    try {
-      const token = await AsyncStorage.getItem('authToken');
-      if (token) {
-        const response = await axios.get(`${API_URL}/auth/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setUser(response.data);
-      }
-    } catch (error) {
-      await AsyncStorage.removeItem('authToken');
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    checkAuth();
+    // Initialize Firebase data
+    const initialize = async () => {
+      await seedSuperAdmin();
+      await initializeDefaultSettings();
+    };
+    initialize();
+
+    // Listen to auth state changes
+    const unsubscribe = onAuthChange(async (firebaseUser) => {
+      setUser(firebaseUser);
+      
+      if (firebaseUser) {
+        // Get user profile from Firestore
+        const userProfile = await getCurrentUserProfile(firebaseUser.uid);
+        setProfile(userProfile);
+      } else {
+        setProfile(null);
+      }
+      
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const login = async (email: string, password: string) => {
     try {
-      const response = await axios.post(`${API_URL}/auth/login`, {
-        email,
-        password,
-      });
-      const { access_token, user: userData } = response.data;
-      await AsyncStorage.setItem('authToken', access_token);
-      setUser(userData);
+      const { user: firebaseUser, profile: userProfile } = await loginUser(email, password);
+      setUser(firebaseUser);
+      setProfile(userProfile);
     } catch (error: any) {
-      throw new Error(error.response?.data?.detail || 'Login failed');
+      throw new Error(error.message);
     }
   };
 
   const logout = async () => {
-    await AsyncStorage.removeItem('authToken');
+    await logoutUser();
     setUser(null);
+    setProfile(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, checkAuth }}>
+    <AuthContext.Provider value={{ user, profile, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
