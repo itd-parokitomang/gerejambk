@@ -50,8 +50,29 @@ export default function AdminDashboard() {
     { id: 'users' as AdminPage, icon: 'people', label: 'Kelola User', badge: profile?.role === 'superadmin' ? null : 'Admin Only' },
   ];
 
-  if (!user || !profile) {
-    return null;
+  // Show loading state
+  if (!user) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Show error if no profile
+  if (!profile) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.errorText}>Profile not found. Please try logging in again.</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={handleLogout}>
+            <Text style={styles.retryButtonText}>Back to Login</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
   }
 
   const renderContent = () => {
