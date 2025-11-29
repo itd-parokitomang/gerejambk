@@ -78,6 +78,7 @@ export default function PagesManagement() {
       order: pages.length,
       active: true,
       richTextContent: '',
+      youtubeVideos: [],
     });
     setShowModal(true);
   };
