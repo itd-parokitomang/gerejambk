@@ -1,67 +1,100 @@
 diff --git a/frontend/components/admin/PagesManagement.tsx b/frontend/components/admin/PagesManagement.tsx
-index 5649ee9..ed5e976 100644
+index 5df8763..153244a 100644
 --- a/frontend/components/admin/PagesManagement.tsx
 +++ b/frontend/components/admin/PagesManagement.tsx
-@@ -83,6 +83,35 @@ export default function PagesManagement() {
-     setShowModal(true);
-   };
+@@ -264,9 +264,12 @@ export default function PagesManagement() {
  
-+  const handleAddVideo = () => {
-+    const newVideo = {
-+      id: Date.now().toString(),
-+      title: '',
-+      videoId: '',
-+      thumbnailUrl: '',
-+    };
-+    setFormData({
-+      ...formData,
-+      youtubeVideos: [...(formData.youtubeVideos || []), newVideo],
-+    });
-+  };
-+
-+  const handleRemoveVideo = (videoId: string) => {
-+    setFormData({
-+      ...formData,
-+      youtubeVideos: formData.youtubeVideos?.filter((v) => v.id !== videoId) || [],
-+    });
-+  };
-+
-+  const handleVideoChange = (videoId: string, field: string, value: string) => {
-+    setFormData({
-+      ...formData,
-+      youtubeVideos: formData.youtubeVideos?.map((v) =>
-+        v.id === videoId ? { ...v, [field]: value } : v
-+      ) || [],
-+    });
-+  };
-+
-   const handleEdit = (page: PageContent) => {
-     setEditingPage(page);
-     setFormData({
+       {/* Add/Edit Modal */}
+       <Modal visible={showModal} animationType="slide" transparent={true}>
+-        <View style={styles.modalOverlay}>
++        <KeyboardAvoidingView
++          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
++          style={styles.modalOverlay}
++        >
+           <View style={styles.modalContent}>
+-            <ScrollView>
++            <ScrollView showsVerticalScrollIndicator={false}>
+               {/* Modal Header */}
+               <View style={styles.modalHeader}>
+                 <Text style={styles.modalTitle}>
+@@ -481,7 +484,7 @@ export default function PagesManagement() {
+               </View>
+             </ScrollView>
+           </View>
+-        </View>
++        </KeyboardAvoidingView>
+       </Modal>
+     </View>
+   );
 diff --git a/model.patch b/model.patch
-index eca54e7..e69de29 100644
+index 61b761e..e69de29 100644
 --- a/model.patch
 +++ b/model.patch
-@@ -1,22 +0,0 @@
+@@ -1,67 +0,0 @@
 -diff --git a/frontend/components/admin/PagesManagement.tsx b/frontend/components/admin/PagesManagement.tsx
--index 54a0a3f..5649ee9 100644
+-index 5649ee9..ed5e976 100644
 ---- a/frontend/components/admin/PagesManagement.tsx
 -+++ b/frontend/components/admin/PagesManagement.tsx
--@@ -48,7 +48,9 @@ export default function PagesManagement() {
--     order: 0,
--     active: true,
--     richTextContent: '',
--+    youtubeVideos: [],
--   });
--+  const richText = useRef<RichEditor>(null);
-- 
--   useEffect(() => {
--     loadPages();
--@@ -76,6 +78,7 @@ export default function PagesManagement() {
--       order: pages.length,
--       active: true,
--       richTextContent: '',
--+      youtubeVideos: [],
--     });
+-@@ -83,6 +83,35 @@ export default function PagesManagement() {
 -     setShowModal(true);
 -   };
+- 
+-+  const handleAddVideo = () => {
+-+    const newVideo = {
+-+      id: Date.now().toString(),
+-+      title: '',
+-+      videoId: '',
+-+      thumbnailUrl: '',
+-+    };
+-+    setFormData({
+-+      ...formData,
+-+      youtubeVideos: [...(formData.youtubeVideos || []), newVideo],
+-+    });
+-+  };
+-+
+-+  const handleRemoveVideo = (videoId: string) => {
+-+    setFormData({
+-+      ...formData,
+-+      youtubeVideos: formData.youtubeVideos?.filter((v) => v.id !== videoId) || [],
+-+    });
+-+  };
+-+
+-+  const handleVideoChange = (videoId: string, field: string, value: string) => {
+-+    setFormData({
+-+      ...formData,
+-+      youtubeVideos: formData.youtubeVideos?.map((v) =>
+-+        v.id === videoId ? { ...v, [field]: value } : v
+-+      ) || [],
+-+    });
+-+  };
+-+
+-   const handleEdit = (page: PageContent) => {
+-     setEditingPage(page);
+-     setFormData({
+-diff --git a/model.patch b/model.patch
+-index eca54e7..e69de29 100644
+---- a/model.patch
+-+++ b/model.patch
+-@@ -1,22 +0,0 @@
+--diff --git a/frontend/components/admin/PagesManagement.tsx b/frontend/components/admin/PagesManagement.tsx
+--index 54a0a3f..5649ee9 100644
+----- a/frontend/components/admin/PagesManagement.tsx
+--+++ b/frontend/components/admin/PagesManagement.tsx
+--@@ -48,7 +48,9 @@ export default function PagesManagement() {
+--     order: 0,
+--     active: true,
+--     richTextContent: '',
+--+    youtubeVideos: [],
+--   });
+--+  const richText = useRef<RichEditor>(null);
+-- 
+--   useEffect(() => {
+--     loadPages();
+--@@ -76,6 +78,7 @@ export default function PagesManagement() {
+--       order: pages.length,
+--       active: true,
+--       richTextContent: '',
+--+      youtubeVideos: [],
+--     });
+--     setShowModal(true);
+--   };
