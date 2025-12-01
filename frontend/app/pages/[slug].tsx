@@ -85,6 +85,23 @@ export default function PageDetail() {
     );
   };
 
+  const getYouTubeChannelUrl = () => {
+    if (!page) return undefined;
+    if (page.youtubeChannelUrl) return page.youtubeChannelUrl;
+    if (page.youtubeChannelId) {
+      return `https://www.youtube.com/channel/${page.youtubeChannelId}`;
+    }
+    return undefined;
+  };
+
+  const openYouTubeChannel = () => {
+    const url = getYouTubeChannelUrl();
+    if (!url) return;
+    Linking.openURL(url).catch((err) =>
+      console.warn('Failed to open YouTube channel URL', err),
+    );
+  };
+
   // Halaman khusus tipe webview: fullscreen web content (tanpa judul & "Segera hadir")
   if (page.type === 'webview' && page.webviewUrl) {
     return (
@@ -202,6 +219,59 @@ export default function PageDetail() {
               <Text style={styles.description}>
                 Tambahkan konten untuk halaman ini melalui editor di menu
                 Kelola Halaman.
+              </Text>
+            </View>
+          )
+        ) : page.type === 'youtube_channel' ? (
+          getYouTubeChannelUrl() ? (
+            <View style={styles.youtubeChannelSection}>
+              <View style={styles.youtubeChannelCard}>
+                <View style={styles.youtubeChannelHeader}>
+                  <View style={styles.youtubeChannelIcon}>
+                    <Ionicons name="logo-youtube" size={28} color="#FF0000" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.youtubeChannelTitle} numberOfLines={1}>
+                      {page.youtubeChannelName || 'Channel YouTube'}
+                    </Text>
+                    <Text
+                      style={styles.youtubeChannelUrlText}
+                      numberOfLines={1}
+                    >
+                      {getYouTubeChannelUrl()}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={styles.youtubeChannelDescription}>
+                  Anda akan diarahkan ke channel YouTube resmi di browser atau
+                  aplikasi YouTube.
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.youtubeChannelButton}
+                  activeOpacity={0.9}
+                  onPress={openYouTubeChannel}
+                >
+                  <Ionicons
+                    name="open-outline"
+                    size={18}
+                    color="#FFFFFF"
+                    style={{ marginRight: 6 }}
+                  />
+                  <Text style={styles.youtubeChannelButtonText}>
+                    Buka Channel di YouTube
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.placeholderContainer}>
+              <Ionicons name="logo-youtube" size={64} color="#D2691E" />
+              <Text style={styles.subtitle}>Channel belum diatur</Text>
+              <Text style={styles.description}>
+                Isi URL beranda channel (atau Channel ID) pada tipe halaman ini
+                melalui Kelola Halaman.
               </Text>
             </View>
           )
@@ -345,6 +415,70 @@ export default function PageDetail() {
               </View>
             </View>
           </View>
+        ) : page.type === 'data_table' &&
+            page.tableColumns &&
+            page.tableColumns.length > 0 ? (
+          page.tableData && page.tableData.length > 0 ? (
+            <View style={styles.tableSection}>
+              {page.tableTitle && (
+                <Text style={styles.tableTitle}>{page.tableTitle}</Text>
+              )}
+              <View style={styles.tableCard}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View>
+                    {/* Table Header */}
+                    <View style={styles.tableHeaderRow}>
+                      {page.tableColumns.map((column) => (
+                        <View
+                          key={column.id}
+                          style={[
+                            styles.tableHeaderCell,
+                            { minWidth: 120 },
+                          ]}
+                        >
+                          <Text style={styles.tableHeaderText}>
+                            {column.label || column.id}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                    {/* Table Rows */}
+                    {page.tableData.map((row, rowIndex) => (
+                      <View
+                        key={rowIndex}
+                        style={[
+                          styles.tableRow,
+                          rowIndex % 2 === 0 && styles.tableRowEven,
+                        ]}
+                      >
+                        {page.tableColumns.map((column) => (
+                          <View
+                            key={column.id}
+                            style={[
+                              styles.tableCell,
+                              { minWidth: 120 },
+                            ]}
+                          >
+                            <Text style={styles.tableCellText}>
+                              {String(row[column.id] || '-')}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    ))}
+                  </View>
+                </ScrollView>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.placeholderContainer}>
+              <Ionicons name="grid-outline" size={64} color="#D2691E" />
+              <Text style={styles.subtitle}>Belum ada data</Text>
+              <Text style={styles.description}>
+                Tambahkan data baris melalui menu Kelola Halaman di admin.
+              </Text>
+            </View>
+          )
         ) : (
           <View style={styles.placeholderContainer}>
             <Ionicons name="document-text" size={80} color="#D2691E" />
@@ -569,5 +703,124 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
     color: '#5D4037',
+  },
+  youtubeChannelSection: {
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+  },
+  youtubeChannelCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  youtubeChannelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  youtubeChannelIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFE4E4',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  youtubeChannelTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#5D4037',
+  },
+  youtubeChannelId: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 2,
+  },
+  youtubeChannelDescription: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 16,
+  },
+  youtubeChannelUrlText: {
+    fontSize: 12,
+    color: '#555',
+    marginTop: 2,
+  },
+  youtubeChannelButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: '#FF0000',
+  },
+  youtubeChannelButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  tableSection: {
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+  },
+  tableTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#8B4513',
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  tableCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
+    overflow: 'hidden',
+  },
+  tableHeaderRow: {
+    flexDirection: 'row',
+    backgroundColor: '#8B4513',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  tableHeaderCell: {
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(255,255,255,0.2)',
+  },
+  tableHeaderText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  tableRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  tableRowEven: {
+    backgroundColor: '#FAFAFA',
+  },
+  tableCell: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRightWidth: 1,
+    borderRightColor: '#F0F0F0',
+  },
+  tableCellText: {
+    fontSize: 13,
+    color: '#5D4037',
+    lineHeight: 18,
   },
 });

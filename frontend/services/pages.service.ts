@@ -49,6 +49,7 @@ export interface PageContent {
   // For youtube channel
   youtubeChannelId?: string;
   youtubeChannelName?: string;
+  youtubeChannelUrl?: string;
   
   // For data table
   tableTitle?: string;

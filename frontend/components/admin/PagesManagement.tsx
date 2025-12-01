@@ -55,6 +55,9 @@ export default function PagesManagement() {
     richTextContent: '',
     youtubeVideos: [],
     parentId: undefined,
+    youtubeChannelUrl: undefined,
+    tableColumns: undefined,
+    tableData: undefined,
   });
   const [iconPickerVisible, setIconPickerVisible] = useState(false);
   const richText = useRef<TRichEditor | null>(null);
@@ -88,6 +91,9 @@ export default function PagesManagement() {
       richTextContent: '',
       youtubeVideos: [],
       parentId: undefined,
+      youtubeChannelUrl: undefined,
+      tableColumns: undefined,
+      tableData: undefined,
     });
     setShowModal(true);
   };
@@ -105,6 +111,9 @@ export default function PagesManagement() {
       richTextContent: '',
       youtubeVideos: [],
       parentId: parent.id,
+      youtubeChannelUrl: undefined,
+      tableColumns: undefined,
+      tableData: undefined,
     });
     setShowModal(true);
   };
@@ -138,6 +147,71 @@ export default function PagesManagement() {
     });
   };
 
+  // Table column handlers
+  const handleAddColumn = () => {
+    const newColumn = {
+      id: `col_${Date.now()}`,
+      label: '',
+      type: 'text' as const,
+    };
+    setFormData({
+      ...formData,
+      tableColumns: [...(formData.tableColumns || []), newColumn],
+    });
+  };
+
+  const handleRemoveColumn = (columnId: string) => {
+    const newColumns = formData.tableColumns?.filter((c) => c.id !== columnId) || [];
+    // Also remove this column from all data rows
+    const newData = formData.tableData?.map((row) => {
+      const newRow = { ...row };
+      delete newRow[columnId];
+      return newRow;
+    }) || [];
+    setFormData({
+      ...formData,
+      tableColumns: newColumns,
+      tableData: newData,
+    });
+  };
+
+  const handleColumnChange = (columnId: string, field: string, value: string) => {
+    setFormData({
+      ...formData,
+      tableColumns: formData.tableColumns?.map((c) =>
+        c.id === columnId ? { ...c, [field]: value } : c
+      ) || [],
+    });
+  };
+
+  // Table data row handlers
+  const handleAddRow = () => {
+    const newRow: Record<string, any> = {};
+    formData.tableColumns?.forEach((col) => {
+      newRow[col.id] = '';
+    });
+    setFormData({
+      ...formData,
+      tableData: [...(formData.tableData || []), newRow],
+    });
+  };
+
+  const handleRemoveRow = (rowIndex: number) => {
+    setFormData({
+      ...formData,
+      tableData: formData.tableData?.filter((_, idx) => idx !== rowIndex) || [],
+    });
+  };
+
+  const handleRowCellChange = (rowIndex: number, columnId: string, value: string) => {
+    setFormData({
+      ...formData,
+      tableData: formData.tableData?.map((row, idx) =>
+        idx === rowIndex ? { ...row, [columnId]: value } : row
+      ) || [],
+    });
+  };
+
   const handleEdit = (page: PageContent) => {
     setEditingPage(page);
     setParentForNew(null);
@@ -154,6 +228,7 @@ export default function PagesManagement() {
       youtubeVideos: page.youtubeVideos,
       youtubeChannelId: page.youtubeChannelId,
       youtubeChannelName: page.youtubeChannelName,
+      youtubeChannelUrl: page.youtubeChannelUrl,
       tableTitle: page.tableTitle,
       tableColumns: page.tableColumns,
       tableData: page.tableData,
@@ -506,24 +581,184 @@ export default function PagesManagement() {
                 {formData.type === 'youtube_channel' && (
                   <>
                     <View style={styles.formGroup}>
-                      <Text style={styles.label}>Channel ID</Text>
+                      <Text style={styles.label}>URL Channel (beranda)</Text>
                       <TextInput
                         style={styles.input}
-                        value={formData.youtubeChannelId}
-                        onChangeText={(text) => setFormData({ ...formData, youtubeChannelId: text })}
-                        placeholder="UCxxxxxxxxx"
+                        value={formData.youtubeChannelUrl}
+                        onChangeText={(text) =>
+                          setFormData({ ...formData, youtubeChannelUrl: text })
+                        }
+                        placeholder="https://www.youtube.com/@namaChannel atau /channel/UCxxxx"
                         autoCapitalize="none"
                       />
+                      <Text style={styles.helperText}>
+                        Tempel URL beranda channel, misalnya{' '}
+                        https://www.youtube.com/channel/UC1_up347GdfKBDVGqwjt7Aw
+                        atau https://www.youtube.com/@mohmbilly
+                      </Text>
                     </View>
                     <View style={styles.formGroup}>
                       <Text style={styles.label}>Nama Channel</Text>
                       <TextInput
                         style={styles.input}
                         value={formData.youtubeChannelName}
-                        onChangeText={(text) => setFormData({ ...formData, youtubeChannelName: text })}
-                        placeholder="Nama channel YouTube"
+                        onChangeText={(text) =>
+                          setFormData({ ...formData, youtubeChannelName: text })
+                        }
+                        placeholder="Nama channel YouTube (opsional, untuk judul tampilan)"
                       />
                     </View>
+                  </>
+                )}
+
+                {formData.type === 'data_table' && (
+                  <>
+                    <View style={styles.formGroup}>
+                      <Text style={styles.label}>Judul Tabel</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={formData.tableTitle || ''}
+                        onChangeText={(text) =>
+                          setFormData({ ...formData, tableTitle: text })
+                        }
+                        placeholder="Contoh: Jadwal Misa Minggu Ini"
+                      />
+                    </View>
+
+                    <View style={styles.formGroup}>
+                      <View style={styles.videoListHeader}>
+                        <Text style={styles.label}>Kolom Tabel</Text>
+                        <TouchableOpacity
+                          style={styles.addVideoButton}
+                          onPress={handleAddColumn}
+                        >
+                          <Ionicons name="add-circle" size={20} color="#8B4513" />
+                          <Text style={styles.addVideoText}>Tambah Kolom</Text>
+                        </TouchableOpacity>
+                      </View>
+                      {formData.tableColumns && formData.tableColumns.length > 0 ? (
+                        <ScrollView style={{ maxHeight: 200 }}>
+                          {formData.tableColumns.map((column) => (
+                            <View key={column.id} style={styles.videoItem}>
+                              <View style={styles.videoItemHeader}>
+                                <Text style={styles.videoItemTitle}>
+                                  Kolom: {column.label || '(tanpa label)'}
+                                </Text>
+                                <TouchableOpacity
+                                  onPress={() => handleRemoveColumn(column.id)}
+                                >
+                                  <Ionicons name="trash-outline" size={20} color="#D32F2F" />
+                                </TouchableOpacity>
+                              </View>
+                              <TextInput
+                                style={styles.input}
+                                value={column.label}
+                                onChangeText={(text) =>
+                                  handleColumnChange(column.id, 'label', text)
+                                }
+                                placeholder="Label kolom (contoh: Nama, Tanggal)"
+                              />
+                              <View style={{ marginTop: 8 }}>
+                                <Text style={[styles.helperText, { marginBottom: 6 }]}>
+                                  Tipe Data:
+                                </Text>
+                                <View style={styles.statusRow}>
+                                  {(['text', 'number', 'date'] as const).map((type) => (
+                                    <TouchableOpacity
+                                      key={type}
+                                      style={[
+                                        styles.statusChip,
+                                        column.type === type && styles.statusChipActive,
+                                      ]}
+                                      onPress={() =>
+                                        handleColumnChange(column.id, 'type', type)
+                                      }
+                                    >
+                                      <Text
+                                        style={[
+                                          styles.statusChipText,
+                                          column.type === type &&
+                                            styles.statusChipTextActive,
+                                        ]}
+                                      >
+                                        {type === 'text'
+                                          ? 'Teks'
+                                          : type === 'number'
+                                            ? 'Angka'
+                                            : 'Tanggal'}
+                                      </Text>
+                                    </TouchableOpacity>
+                                  ))}
+                                </View>
+                              </View>
+                            </View>
+                          ))}
+                        </ScrollView>
+                      ) : (
+                        <View style={styles.emptyVideoList}>
+                          <Ionicons name="grid-outline" size={48} color="#CCC" />
+                          <Text style={styles.emptyVideoText}>Belum ada kolom</Text>
+                          <Text style={styles.emptyVideoSubtext}>
+                            Klik &quot;Tambah Kolom&quot; untuk menambahkan
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {formData.tableColumns && formData.tableColumns.length > 0 && (
+                      <View style={styles.formGroup}>
+                        <View style={styles.videoListHeader}>
+                          <Text style={styles.label}>Data Baris</Text>
+                          <TouchableOpacity
+                            style={styles.addVideoButton}
+                            onPress={handleAddRow}
+                          >
+                            <Ionicons name="add-circle" size={20} color="#8B4513" />
+                            <Text style={styles.addVideoText}>Tambah Baris</Text>
+                          </TouchableOpacity>
+                        </View>
+                        {formData.tableData && formData.tableData.length > 0 ? (
+                          <ScrollView style={{ maxHeight: 300 }}>
+                            {formData.tableData.map((row, rowIndex) => (
+                              <View key={rowIndex} style={styles.videoItem}>
+                                <View style={styles.videoItemHeader}>
+                                  <Text style={styles.videoItemTitle}>
+                                    Baris {rowIndex + 1}
+                                  </Text>
+                                  <TouchableOpacity
+                                    onPress={() => handleRemoveRow(rowIndex)}
+                                  >
+                                    <Ionicons name="trash-outline" size={20} color="#D32F2F" />
+                                  </TouchableOpacity>
+                                </View>
+                                {formData.tableColumns?.map((column) => (
+                                  <TextInput
+                                    key={column.id}
+                                    style={[styles.input, { marginTop: 8 }]}
+                                    value={String(row[column.id] || '')}
+                                    onChangeText={(text) =>
+                                      handleRowCellChange(rowIndex, column.id, text)
+                                    }
+                                    placeholder={column.label || 'Isi data'}
+                                    keyboardType={
+                                      column.type === 'number' ? 'numeric' : 'default'
+                                    }
+                                  />
+                                ))}
+                              </View>
+                            ))}
+                          </ScrollView>
+                        ) : (
+                          <View style={styles.emptyVideoList}>
+                            <Ionicons name="list-outline" size={48} color="#CCC" />
+                            <Text style={styles.emptyVideoText}>Belum ada data</Text>
+                            <Text style={styles.emptyVideoSubtext}>
+                              Klik &quot;Tambah Baris&quot; untuk menambahkan data
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    )}
                   </>
                 )}
 
