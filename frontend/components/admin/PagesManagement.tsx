@@ -13,7 +13,9 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { RichEditor, RichToolbar, actions } from 'react-native-pell-rich-editor';
+// Rich text editor hanya digunakan di platform non-web.
+// Import runtime dilakukan secara kondisional supaya tidak memicu error "window is not defined" di web/SSR.
+import type { RichEditor as TRichEditor } from 'react-native-pell-rich-editor';
 import {
   getAllPages,
   createPage,
@@ -23,11 +25,13 @@ import {
   PageType,
 } from '../../services/pages.service';
 import { useAuth } from '../../contexts/AuthContext';
+import { IconPicker } from '../common/IconPicker';
 
 type PageFormData = Omit<PageContent, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>;
 
 const PAGE_TYPES: Array<{ value: PageType; label: string; icon: string }> = [
   { value: 'static', label: 'Halaman Statis', icon: 'document-text' },
+  { value: 'parent', label: 'Halaman Induk (Group Menu)', icon: 'albums' },
   { value: 'webview', label: 'WebView', icon: 'globe' },
   { value: 'youtube_video', label: 'Video YouTube', icon: 'play-circle' },
   { value: 'youtube_channel', label: 'Channel YouTube', icon: 'tv' },
@@ -40,6 +44,7 @@ export default function PagesManagement() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingPage, setEditingPage] = useState<PageContent | null>(null);
+  const [parentForNew, setParentForNew] = useState<PageContent | null>(null);
   const [formData, setFormData] = useState<PageFormData>({
     title: '',
     slug: '',
@@ -49,8 +54,10 @@ export default function PagesManagement() {
     active: true,
     richTextContent: '',
     youtubeVideos: [],
+    parentId: undefined,
   });
-  const richText = useRef<RichEditor>(null);
+  const [iconPickerVisible, setIconPickerVisible] = useState(false);
+  const richText = useRef<TRichEditor | null>(null);
 
   useEffect(() => {
     loadPages();
@@ -70,6 +77,7 @@ export default function PagesManagement() {
 
   const handleAddNew = () => {
     setEditingPage(null);
+    setParentForNew(null);
     setFormData({
       title: '',
       slug: '',
@@ -79,6 +87,24 @@ export default function PagesManagement() {
       active: true,
       richTextContent: '',
       youtubeVideos: [],
+      parentId: undefined,
+    });
+    setShowModal(true);
+  };
+
+  const handleAddChild = (parent: PageContent) => {
+    setEditingPage(null);
+    setParentForNew(parent);
+    setFormData({
+      title: '',
+      slug: '',
+      icon: parent.icon || 'document-text',
+      type: 'static',
+      order: pages.length,
+      active: true,
+      richTextContent: '',
+      youtubeVideos: [],
+      parentId: parent.id,
     });
     setShowModal(true);
   };
@@ -114,6 +140,7 @@ export default function PagesManagement() {
 
   const handleEdit = (page: PageContent) => {
     setEditingPage(page);
+    setParentForNew(null);
     setFormData({
       title: page.title,
       slug: page.slug,
@@ -122,6 +149,7 @@ export default function PagesManagement() {
       order: page.order,
       active: page.active,
       richTextContent: page.richTextContent || '',
+      parentId: page.parentId,
       webviewUrl: page.webviewUrl,
       youtubeVideos: page.youtubeVideos,
       youtubeChannelId: page.youtubeChannelId,
@@ -244,19 +272,28 @@ export default function PagesManagement() {
                   </TouchableOpacity>
                 </View>
               </View>
-              <View style={styles.pageFooter}>
-                <TouchableOpacity style={styles.actionButton} onPress={() => handleEdit(page)}>
-                  <Ionicons name="create-outline" size={20} color="#8B4513" />
-                  <Text style={styles.actionButtonText}>Edit</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.deleteButton]}
-                  onPress={() => handleDelete(page)}
-                >
-                  <Ionicons name="trash-outline" size={20} color="#D32F2F" />
-                  <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Hapus</Text>
-                </TouchableOpacity>
-              </View>
+                <View style={styles.pageFooter}>
+                  {page.type === 'parent' && (
+                    <TouchableOpacity
+                      style={[styles.actionButton, styles.addChildButton]}
+                      onPress={() => handleAddChild(page)}
+                    >
+                      <Ionicons name="add-circle-outline" size={18} color="#8B4513" />
+                      <Text style={styles.actionButtonText}>Sub Halaman</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity style={styles.actionButton} onPress={() => handleEdit(page)}>
+                    <Ionicons name="create-outline" size={20} color="#8B4513" />
+                    <Text style={styles.actionButtonText}>Edit</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.deleteButton]}
+                    onPress={() => handleDelete(page)}
+                  >
+                    <Ionicons name="trash-outline" size={20} color="#D32F2F" />
+                    <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Hapus</Text>
+                  </TouchableOpacity>
+                </View>
             </View>
           ))}
         </ScrollView>
@@ -282,6 +319,21 @@ export default function PagesManagement() {
 
               {/* Form */}
               <View style={styles.form}>
+                {parentForNew && !editingPage && (
+                  <View style={styles.infoParentBox}>
+                    <Text style={styles.infoParentLabel}>Sub halaman dari:</Text>
+                    <View style={styles.infoParentRow}>
+                      <Ionicons
+                        name={parentForNew.icon as any}
+                        size={18}
+                        color="#8B4513"
+                      />
+                      <Text style={styles.infoParentTitle}>
+                        {parentForNew.title}
+                      </Text>
+                    </View>
+                  </View>
+                )}
                 <View style={styles.formGroup}>
                   <Text style={styles.label}>Judul Halaman *</Text>
                   <TextInput
@@ -337,31 +389,58 @@ export default function PagesManagement() {
                 {formData.type === 'static' && (
                   <View style={styles.formGroup}>
                     <Text style={styles.label}>Konten Halaman</Text>
-                    <View style={styles.richEditorContainer}>
-                      <RichToolbar
-                        editor={richText}
-                        actions={[
-                          actions.setBold,
-                          actions.setItalic,
-                          actions.setUnderline,
-                          actions.heading1,
-                          actions.heading2,
-                          actions.insertBulletsList,
-                          actions.insertOrderedList,
-                          actions.insertLink,
-                          actions.undo,
-                          actions.redo,
-                        ]}
-                        style={styles.richToolbar}
+                    {Platform.OS === 'web' ? (
+                      // Fallback sederhana di web untuk menghindari error "window is not defined"
+                      <TextInput
+                        style={[styles.input, styles.textarea]}
+                        multiline
+                        numberOfLines={6}
+                        value={formData.richTextContent || ''}
+                        onChangeText={(text) =>
+                          setFormData({ ...formData, richTextContent: text })
+                        }
+                        placeholder="Tulis konten halaman di sini... (mode teks biasa di web)"
                       />
-                      <RichEditor
-                        ref={richText}
-                        initialContentHTML={formData.richTextContent || ''}
-                        onChange={(text) => setFormData({ ...formData, richTextContent: text })}
-                        placeholder="Tulis konten halaman di sini..."
-                        style={styles.richEditor}
-                      />
-                    </View>
+                    ) : (
+                      <View style={styles.richEditorContainer}>
+                        {(() => {
+                          // Import runtime hanya di platform non-web
+                          const { RichEditor, RichToolbar, actions } =
+                            // eslint-disable-next-line @typescript-eslint/no-var-requires
+                            require('react-native-pell-rich-editor');
+
+                          return (
+                            <>
+                              <RichToolbar
+                                editor={richText}
+                                actions={[
+                                  actions.setBold,
+                                  actions.setItalic,
+                                  actions.setUnderline,
+                                  actions.heading1,
+                                  actions.heading2,
+                                  actions.insertBulletsList,
+                                  actions.insertOrderedList,
+                                  actions.insertLink,
+                                  actions.undo,
+                                  actions.redo,
+                                ]}
+                                style={styles.richToolbar}
+                              />
+                              <RichEditor
+                                ref={richText}
+                                initialContentHTML={formData.richTextContent || ''}
+                                onChange={(text: string) =>
+                                  setFormData({ ...formData, richTextContent: text })
+                                }
+                                placeholder="Tulis konten halaman di sini..."
+                                style={styles.richEditor}
+                              />
+                            </>
+                          );
+                        })()}
+                      </View>
+                    )}
                   </View>
                 )}
 
@@ -450,14 +529,32 @@ export default function PagesManagement() {
 
                 <View style={styles.formGroup}>
                   <Text style={styles.label}>Icon</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={formData.icon}
-                    onChangeText={(text) => setFormData({ ...formData, icon: text })}
-                    placeholder="document-text"
-                    autoCapitalize="none"
-                  />
-                  <Text style={styles.helperText}>Icon dari Ionicons (cari di icons.expo.fyi)</Text>
+                  <View style={styles.iconPreviewRow}>
+                    <View style={styles.iconPreviewCircle}>
+                      <Ionicons
+                        name={(formData.icon || 'document-text') as any}
+                        size={22}
+                        color="#8B4513"
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.iconPreviewName}>
+                        {formData.icon || 'document-text'}
+                      </Text>
+                      <Text style={styles.helperText}>
+                        Pilih icon dari daftar Ionicons.
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.pickIconButton}
+                      onPress={() => setIconPickerVisible(true)}
+                    >
+                      <Text style={styles.pickIconButtonText}>Pilih Icon</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.helperText}>
+                    Icon akan tampil di menu utama dan daftar halaman.
+                  </Text>
                 </View>
 
                 <View style={styles.formGroup}>
@@ -486,6 +583,16 @@ export default function PagesManagement() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <IconPicker
+        visible={iconPickerVisible}
+        value={formData.icon}
+        onClose={() => setIconPickerVisible(false)}
+        onSelect={(iconName) => {
+          setFormData((prev) => ({ ...prev, icon: iconName }));
+          setIconPickerVisible(false);
+        }}
+      />
     </View>
   );
 }
@@ -636,6 +743,9 @@ const styles = StyleSheet.create({
   },
   deleteButtonText: {
     color: '#D32F2F',
+  },
+  addChildButton: {
+    backgroundColor: '#FFF5E0',
   },
   modalOverlay: {
     flex: 1,
@@ -828,5 +938,58 @@ const styles = StyleSheet.create({
     color: '#BBB',
     marginTop: 4,
     textAlign: 'center',
+  },
+  iconPreviewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  iconPreviewCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFF5E0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  iconPreviewName: {
+    fontSize: 12,
+    color: '#555',
+    fontWeight: '500',
+  },
+  pickIconButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#8B4513',
+  },
+  pickIconButtonText: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  infoParentBox: {
+    marginBottom: 16,
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: '#FFF5E0',
+    flexDirection: 'column',
+    gap: 4,
+  },
+  infoParentLabel: {
+    fontSize: 12,
+    color: '#A67C52',
+    textTransform: 'uppercase',
+    fontWeight: '600',
+  },
+  infoParentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  infoParentTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#5D4037',
   },
 });

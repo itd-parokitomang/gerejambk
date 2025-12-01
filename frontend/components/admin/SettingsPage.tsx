@@ -56,7 +56,7 @@ export default function SettingsPage() {
         }
       }
 
-      const result = await ImagePicker.launchImagePickerAsync({
+      const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: true,
         aspect: type === 'favicon' ? [1, 1] : [1, 1],

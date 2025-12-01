@@ -1,36 +1,331 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  TouchableOpacity,
+  Image,
+  Linking,
+  Platform,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  getPageBySlug,
+  getChildPages,
+  PageContent,
+} from '../../services/pages.service';
 
 export default function PageDetail() {
-  const { slug } = useLocalSearchParams();
+  const { slug } = useLocalSearchParams<{ slug: string }>();
+  const router = useRouter();
+  const [page, setPage] = useState<PageContent | null>(null);
+  const [children, setChildren] = useState<PageContent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeVideoIndex, setActiveVideoIndex] = useState(0);
 
-  const getPageTitle = (slug: string) => {
-    const titles: { [key: string]: string } = {
-      misa: 'Misa Gereja & Intensi Misa',
-      paroki: 'Paroki Tomang - Gereja MBK',
-      pelayanan: 'Pelayanan Gereja MBK',
-      renungan: 'Renungan Harian Katolik',
-      kegiatan: 'Kegiatan MBK Akan Datang',
-      kontak: 'Kontak & Informasi',
+  useEffect(() => {
+    const load = async () => {
+      if (!slug) return;
+      setLoading(true);
+      const p = await getPageBySlug(String(slug));
+      if (p) {
+        setPage(p);
+        if (p.type === 'parent') {
+          const subs = await getChildPages(p.id);
+          setChildren(subs);
+        } else if (p.type === 'youtube_video' && p.youtubeVideos?.length) {
+          setActiveVideoIndex(0);
+        }
+      } else {
+        setPage(null);
+      }
+      setLoading(false);
     };
-    return titles[slug as string] || 'Halaman';
+    load();
+  }, [slug]);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container} edges={['bottom']}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#8B4513" />
+          <Text style={styles.loadingText}>Memuat halaman...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!page) {
+    return (
+      <SafeAreaView style={styles.container} edges={['bottom']}>
+        <View className="placeholderContainer">
+          <Ionicons name="alert-circle-outline" size={64} color="#D2691E" />
+          <Text style={styles.title}>Halaman tidak ditemukan</Text>
+          <Text style={styles.description}>
+            Halaman yang Anda cari tidak tersedia atau telah dihapus.
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const isParent = page.type === 'parent';
+
+  const openYouTubeExternal = (videoId: string) => {
+    const url = `https://www.youtube.com/watch?v=${videoId}`;
+    Linking.openURL(url).catch((err) =>
+      console.warn('Failed to open YouTube URL', err),
+    );
   };
+
+  // Halaman khusus tipe webview: fullscreen web content (tanpa judul & "Segera hadir")
+  if (page.type === 'webview' && page.webviewUrl) {
+    return (
+      <SafeAreaView style={styles.container} edges={['bottom']}>
+        <View style={{ flex: 1 }}>
+          {Platform.OS === 'web' ? (
+            <iframe
+              style={{
+                width: '100%',
+                height: '100%',
+                border: 'none',
+              }}
+              src={page.webviewUrl}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+              title={page.title || 'Embedded page'}
+            />
+          ) : (
+            (() => {
+              // eslint-disable-next-line @typescript-eslint/no-var-requires
+              const { WebView } = require('react-native-webview');
+              return (
+                <WebView
+                  style={{ flex: 1 }}
+                  source={{ uri: page.webviewUrl! }}
+                  javaScriptEnabled
+                  domStorageEnabled
+                  allowsInlineMediaPlayback
+                />
+              );
+            })()
+          )}
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <ScrollView style={styles.content}>
-        <View style={styles.placeholderContainer}>
-          <Ionicons name="document-text" size={80} color="#D2691E" />
-          <Text style={styles.title}>{getPageTitle(slug as string)}</Text>
-          <Text style={styles.subtitle}>Segera Hadir</Text>
-          <Text style={styles.description}>
-            Halaman ini sedang dalam tahap pengembangan.
-            Konten akan ditambahkan melalui admin panel.
-          </Text>
+        <View style={styles.header}>
+          <View style={styles.headerIcon}>
+            <Ionicons name={page.icon as any} size={32} color="#8B4513" />
+          </View>
+          <View style={styles.headerText}>
+            <Text
+              style={isParent ? styles.parentTitle : styles.title}
+              numberOfLines={2}
+            >
+              {page.title}
+            </Text>
+            {isParent ? (
+              <Text style={styles.subtitle}>
+                Pilih salah satu sub halaman di bawah ini.
+              </Text>
+            ) : (
+              <Text style={styles.subtitle}>Segera hadir</Text>
+            )}
+          </View>
         </View>
+
+        {isParent ? (
+          children.length > 0 ? (
+            <View style={styles.cardsGrid}>
+              {children.map((child) => (
+                <TouchableOpacity
+                  key={child.id}
+                  style={styles.card}
+                  onPress={() => router.push(`/pages/${child.slug}`)}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.cardIcon}>
+                    <Ionicons
+                      name={child.icon as any}
+                      size={24}
+                      color="#8B4513"
+                    />
+                  </View>
+                  <Text style={styles.cardTitle}>{child.title}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.placeholderContainer}>
+              <Ionicons
+                name="document-text-outline"
+                size={64}
+                color="#D2691E"
+              />
+              <Text style={styles.subtitle}>Belum ada sub halaman</Text>
+              <Text style={styles.description}>
+                Tambahkan sub halaman baru melalui menu Kelola Halaman di admin.
+              </Text>
+            </View>
+          )
+        ) : page.type === 'youtube_video' && page.youtubeVideos ? (
+          page.youtubeVideos.length > 0 ? (
+            <View style={styles.videoSection}>
+              {/* Video unggulan */}
+              {(() => {
+                const [first, ...rest] = page.youtubeVideos!;
+                const active =
+                  page.youtubeVideos![activeVideoIndex] ?? first;
+                const featuredThumb =
+                  active.thumbnailUrl ||
+                  `https://img.youtube.com/vi/${active.videoId}/hqdefault.jpg`;
+
+                return (
+                  <>
+                    <View style={styles.videoFeaturedCard}>
+                      <View style={styles.videoPlayerContainer}>
+                        {Platform.OS === 'web' ? (
+                          // Di web gunakan iframe langsung (didukung React DOM)
+                          <iframe
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              border: 'none',
+                            }}
+                            src={`https://www.youtube.com/embed/${active.videoId}?rel=0&playsinline=1&controls=1`}
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                            allowFullScreen
+                            title={active.title || 'YouTube video player'}
+                          />
+                        ) : (
+                          // Di mobile/native gunakan WebView lewat require dinamis
+                          (() => {
+                            // eslint-disable-next-line @typescript-eslint/no-var-requires
+                            const { WebView } = require('react-native-webview');
+                            return (
+                              <WebView
+                                style={styles.videoPlayer}
+                                source={{
+                                  uri: `https://www.youtube.com/embed/${active.videoId}?rel=0&playsinline=1&controls=1`,
+                                }}
+                                javaScriptEnabled
+                                domStorageEnabled
+                                allowsInlineMediaPlayback
+                              />
+                            );
+                          })()
+                        )}
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => openYouTubeExternal(active.videoId)}
+                        activeOpacity={0.9}
+                      >
+                        <Text
+                          style={styles.videoFeaturedTitle}
+                          numberOfLines={2}
+                        >
+                          {active.title || 'Video Utama'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Grid 2 kolom untuk video lain */}
+                    {rest.length > 0 && (
+                      <View style={styles.videoGrid}>
+                        {page.youtubeVideos!.map((video, index) => {
+                          if (index === activeVideoIndex) return null;
+                          const thumb =
+                            video.thumbnailUrl ||
+                            `https://img.youtube.com/vi/${video.videoId}/mqdefault.jpg`;
+
+                          return (
+                            <TouchableOpacity
+                              key={video.id}
+                              style={styles.videoGridItem}
+                              onPress={() => setActiveVideoIndex(index)}
+                              activeOpacity={0.9}
+                            >
+                              <Text
+                                style={styles.videoGridTitle}
+                                numberOfLines={2}
+                              >
+                                {video.title || 'Video YouTube'}
+                              </Text>
+                              <Image
+                                source={{ uri: thumb }}
+                                style={styles.videoGridImage}
+                              />
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    )}
+                  </>
+                );
+              })()}
+            </View>
+          ) : (
+            <View style={styles.placeholderContainer}>
+              <Ionicons name="videocam-outline" size={64} color="#D2691E" />
+              <Text style={styles.subtitle}>Belum ada video</Text>
+              <Text style={styles.description}>
+                Tambahkan video pada tipe halaman ini melalui Kelola Halaman di
+                admin.
+              </Text>
+            </View>
+          )
+        ) : page.type === 'webview' && page.webviewUrl ? (
+          <View style={styles.webviewSection}>
+            <View style={styles.webviewCard}>
+              <View style={styles.webviewContainer}>
+                {Platform.OS === 'web' ? (
+                  <iframe
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      border: 'none',
+                    }}
+                    src={page.webviewUrl}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                    title={page.title || 'Embedded page'}
+                  />
+                ) : (
+                  (() => {
+                    // eslint-disable-next-line @typescript-eslint/no-var-requires
+                    const { WebView } = require('react-native-webview');
+                    return (
+                      <WebView
+                        style={styles.webviewPlayer}
+                        source={{ uri: page.webviewUrl! }}
+                        javaScriptEnabled
+                        domStorageEnabled
+                        allowsInlineMediaPlayback
+                      />
+                    );
+                  })()
+                )}
+              </View>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.placeholderContainer}>
+            <Ionicons name="document-text" size={80} color="#D2691E" />
+            <Text style={styles.subtitle}>Segera Hadir</Text>
+            <Text style={styles.description}>
+              Konten untuk halaman ini akan ditambahkan melalui admin panel.
+            </Text>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -44,31 +339,187 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
-  placeholderContainer: {
+  loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 32,
-    paddingVertical: 64,
+    padding: 24,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#8B4513',
-    textAlign: 'center',
-    marginTop: 24,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#D2691E',
-    marginBottom: 16,
-  },
-  description: {
+  loadingText: {
+    marginTop: 12,
     fontSize: 16,
     color: '#666',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 12,
+  },
+  headerIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FFF1DE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  headerText: {
+    flex: 1,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#8B4513',
+    marginBottom: 4,
+  },
+  parentTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#8B4513',
+    marginBottom: 2,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#7A5A3A',
+  },
+  placeholderContainer: {
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 40,
+  },
+  description: {
+    fontSize: 14,
+    color: '#666',
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 20,
+    marginTop: 8,
+  },
+  cardsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+    gap: 12,
+  },
+  card: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  cardIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#FFF5E0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#5D4037',
+  },
+  videoSection: {
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+  },
+  videoFeaturedCard: {
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    padding: 10,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  videoFeaturedTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#5D4037',
+    marginBottom: 8,
+  },
+  videoPlayerContainer: {
+    width: '100%',
+    height: 210,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+    marginBottom: 10,
+  },
+  videoPlayer: {
+    flex: 1,
+  },
+  videoFeaturedImage: {
+    width: '100%',
+    height: 190,
+    borderRadius: 14,
+    backgroundColor: '#DDD',
+  },
+  videoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  videoGridItem: {
+    width: '48%',
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    padding: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  videoGridTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#5D4037',
+    marginBottom: 6,
+  },
+  videoGridImage: {
+    width: '100%',
+    height: 110,
+    borderRadius: 12,
+    backgroundColor: '#DDD',
+  },
+  webviewSection: {
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+  },
+  webviewCard: {
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    padding: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  webviewContainer: {
+    width: '100%',
+    height: 400,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: '#FFF',
+  },
+  webviewPlayer: {
+    flex: 1,
   },
 });

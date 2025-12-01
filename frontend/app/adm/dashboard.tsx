@@ -14,8 +14,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect } from 'react';
 import SettingsPage from '../../components/admin/SettingsPage';
 import PagesManagement from '../../components/admin/PagesManagement';
+import SliderManagement from '../../components/admin/SliderManagement';
 
-type AdminPage = 'overview' | 'settings' | 'pages' | 'users';
+type AdminPage = 'overview' | 'settings' | 'sliders' | 'pages' | 'users';
 
 export default function AdminDashboard() {
   const { user, profile, logout } = useAuth();
@@ -42,6 +43,7 @@ export default function AdminDashboard() {
   const menuItems = [
     { id: 'overview' as AdminPage, icon: 'home', label: 'Dashboard', badge: null },
     { id: 'settings' as AdminPage, icon: 'settings', label: 'Settings Umum', badge: null },
+    { id: 'sliders' as AdminPage, icon: 'images', label: 'Slider Beranda', badge: null },
     { id: 'pages' as AdminPage, icon: 'document-text', label: 'Kelola Halaman', badge: null },
     { id: 'users' as AdminPage, icon: 'people', label: 'Kelola User', badge: profile?.role === 'superadmin' ? null : 'Admin Only' },
   ];
@@ -111,6 +113,17 @@ export default function AdminDashboard() {
             <Text style={styles.pageTitle}>Settings Umum</Text>
             <Text style={styles.pageSubtitle}>Kelola pengaturan aplikasi</Text>
             <SettingsPage />
+          </View>
+        );
+
+      case 'sliders':
+        return (
+          <View style={styles.contentSection}>
+            <Text style={styles.pageTitle}>Slider Beranda</Text>
+            <Text style={styles.pageSubtitle}>
+              Atur isi slider kecil di beranda (gambar atau teks)
+            </Text>
+            <SliderManagement />
           </View>
         );
       

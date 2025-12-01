@@ -1,0 +1,59 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'superadmin'];
+    }
+    
+    function isSuperAdmin() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superadmin';
+    }
+    
+    // Superadmin berbasis email (untuk login pertama sebelum profile dibuat)
+    function isSuperAdminEmail() {
+      return isAuthenticated() &&
+             request.auth.token.email == 'joni@email.com';
+    }
+    
+    // Allow authenticated users to create their own profile on first login
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isAdmin() || request.auth.uid == userId;
+      allow delete: if isSuperAdmin();
+    }
+    
+    match /settings/{settingId} {
+      allow read: if true;
+      // Settings hanya boleh dikelola dari dashboard admin
+      allow create: if isAdmin() || isSuperAdminEmail();
+      allow update: if isAdmin() || isSuperAdminEmail();
+      allow delete: if isSuperAdmin() || isSuperAdminEmail();
+    }
+    
+    match /pages/{pageId} {
+      allow read: if true;
+      // Admin & superadmin boleh kelola halaman,
+      // plus superadmin berdasarkan email (untuk inisialisasi pertama kali).
+      allow write: if isAdmin() || isSuperAdminEmail();
+    }
+
+    // Slider beranda (digunakan untuk slider kecil di homepage)
+    match /sliders/{sliderId} {
+      // Beranda publik perlu bisa membaca slider
+      allow read: if true;
+
+      // Hanya admin/superadmin yang boleh membuat, mengubah, dan menghapus slider
+      allow write: if isAdmin() || isSuperAdminEmail();
+    }
+  }
+}

@@ -42,18 +42,16 @@ Aplikasi hybrid mobile-web untuk Paroki Santa Maria Bunda Karmel Tomang, Jakarta
 - **AsyncStorage** - Local data persistence
 - **Axios** - HTTP client
 
-### Backend
-- **FastAPI** - Modern Python web framework
-- **MongoDB** - NoSQL database
-- **Motor** - Async MongoDB driver
-- **JWT** - Authentication tokens
-- **Passlib** - Password hashing
+### Backend (Serverless)
+- **Firebase Authentication** - Login & session management
+- **Cloud Firestore** - Database utama
+- **Firebase Security Rules** - Authorization & access control
 
 ## 📁 Struktur Proyek
 
 ```
 app/
-├── frontend/                 # Aplikasi Expo
+├── frontend/                 # Aplikasi Expo (React Native + Web) dengan Firebase
 │   ├── app/                 # File-based routing
 │   │   ├── index.tsx       # Homepage
 │   │   ├── adm/            # Admin panel
@@ -66,61 +64,31 @@ app/
 │   │   └── AuthContext.tsx # Authentication
 │   ├── assets/             # Images & fonts
 │   └── package.json
-├── backend/                 # FastAPI server
-│   ├── server.py           # Main application
-│   ├── requirements.txt    # Python dependencies
-│   └── .env               # Environment variables
-└── DEPLOYMENT.md          # Deployment guide
+└── docs/                   # Dokumentasi arsitektur & setup
 ```
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 - Node.js 18+
-- Python 3.11+
-- MongoDB
 - Yarn
 
 ### Installation
 
 1. **Clone & Install Dependencies**
 ```bash
-# Frontend
 cd frontend
 yarn install
-
-# Backend
-cd ../backend
-pip install -r requirements.txt
 ```
 
-2. **Setup Environment Variables**
-
-Frontend (`frontend/.env`):
-```env
-EXPO_PUBLIC_BACKEND_URL=http://localhost:8001
-```
-
-Backend (`backend/.env`):
-```env
-MONGO_URL=mongodb://localhost:27017
-DB_NAME=paroki_tomang
-JWT_SECRET_KEY=your-secret-key
-```
-
-3. **Run Development**
+2. **Run Development (Expo)**
 
 ```bash
-# Terminal 1 - Backend
-cd backend
-uvicorn server:app --reload --port 8001
-
-# Terminal 2 - Frontend
 cd frontend
 yarn start
 ```
 
-4. **Access**
+3. **Access**
 - Web: http://localhost:3000
 - Mobile: Scan QR code dengan Expo Go app
 - Admin: http://localhost:3000/adm
@@ -177,25 +145,12 @@ yarn start
 curl http://localhost:3000
 ```
 
-**Backend Health:**
-```bash
-curl http://localhost:8001/api/health
-```
-
-**Admin Login:**
-```bash
-curl -X POST http://localhost:8001/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"joni@email.com","password":"joni2#Marjoni"}'
-```
-
 ## 📦 Deployment
 
-Lihat [DEPLOYMENT.md](./DEPLOYMENT.md) untuk panduan lengkap deployment ke:
+Lihat `docs/setup.md` dan `docs/arsitektur.md` untuk panduan lengkap deployment ke:
 - ✅ Vercel (Web)
 - ✅ Netlify (Web)
 - ✅ Expo EAS (Mobile)
-- ✅ Heroku/Railway (Backend)
 
 ## 🎨 Color Scheme
 

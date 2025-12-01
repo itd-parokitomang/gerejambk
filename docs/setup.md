@@ -154,15 +154,8 @@ yarn install
 
 ### Step 2: Environment Variables
 
-File `/app/frontend/.env` already configured:
-
-```env
-EXPO_PACKAGER_PROXY_URL=...
-EXPO_PACKAGER_HOSTNAME=...
-EXPO_PUBLIC_BACKEND_URL=...
-```
-
-⚠️ **DO NOT MODIFY** these variables!
+Untuk setup standar, file `/app/frontend/.env` **tidak wajib**.  
+Jika Anda menambah `.env`, cukup gunakan variabel yang memang dipakai di kode (misalnya untuk konfigurasi Expo/Firebase tambahan), dan **tidak perlu** `EXPO_PUBLIC_BACKEND_URL` karena backend sudah murni Firebase.
 
 ### Step 3: Verify Expo Configuration
 
@@ -216,8 +209,6 @@ expo start --tunnel
 │   ├── arsitektur.md
 │   ├── setup.md
 │   └── code.md
-│
-└── backend/           # ❌ NOT USED (kept for reference)
 ```
 
 ### Development Workflow
@@ -293,13 +284,6 @@ vercel --prod ./dist
    - Build Command: `cd frontend && expo export --platform web`
    - Output Directory: `frontend/dist`
 4. Deploy!
-
-**Step 3: Configure Environment Variables**
-
-In Vercel dashboard, add:
-```
-EXPO_PUBLIC_BACKEND_URL=https://your-domain.com
-```
 
 ### Web Deployment (Netlify)
 

@@ -8,6 +8,7 @@ import {
   seedSuperAdmin
 } from '../services/auth.service';
 import { initializeDefaultSettings } from '../services/settings.service';
+import { initializeDefaultPages } from '../services/pages.service';
 import { UserProfile } from '../services/auth.service';
 
 interface AuthContextType {
@@ -30,6 +31,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const initialize = async () => {
       await seedSuperAdmin();
       await initializeDefaultSettings();
+      await initializeDefaultPages();
     };
     initialize();
 

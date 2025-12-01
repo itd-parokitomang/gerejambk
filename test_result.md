@@ -105,53 +105,17 @@
 user_problem_statement: "Aplikasi hybrid mobile-web untuk Paroki Tomang - SuperApp style dengan slider dan grid menu icons, plus admin panel"
 
 backend:
-  - task: "Authentication API (Login)"
+  - task: "Serverless backend (Firebase Auth + Firestore)"
     implemented: true
     working: true
-    file: "backend/server.py"
+    file: "frontend/config/firebase.ts"
     stuck_count: 0
     priority: "high"
     needs_retesting: false
     status_history:
       - working: true
         agent: "main"
-        comment: "JWT-based authentication implemented with hardcoded admin credentials (joni@email.com / joni2#Marjoni). Login endpoint returns access token successfully."
-  
-  - task: "Health Check Endpoint"
-    implemented: true
-    working: true
-    file: "backend/server.py"
-    stuck_count: 0
-    priority: "low"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "main"
-        comment: "Health check endpoint returning status and timestamp successfully"
-  
-  - task: "Slider Management API (Future)"
-    implemented: true
-    working: "NA"
-    file: "backend/server.py"
-    stuck_count: 0
-    priority: "medium"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "GET /api/sliders and POST /api/sliders endpoints created for future use. Not yet used by frontend."
-  
-  - task: "Menu Management API (Future)"
-    implemented: true
-    working: "NA"
-    file: "backend/server.py"
-    stuck_count: 0
-    priority: "medium"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "main"
-        comment: "GET /api/menus and POST /api/menus endpoints created for future use. Not yet used by frontend."
+        comment: "Backend menggunakan Firebase Authentication dan Cloud Firestore dengan konfigurasi di frontend/config/firebase.ts. Tidak ada lagi server FastAPI/Mongo yang aktif digunakan."
 
 frontend:
   - task: "Homepage with Slider"

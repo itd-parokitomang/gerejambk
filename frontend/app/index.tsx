@@ -1,31 +1,50 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
-  Image,
-  Platform,
   FlatList,
+  Image,
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { SliderItem, getActiveSliders } from '../services/sliders.service';
+import { PageContent, getActivePages } from '../services/pages.service';
 
-// Dummy slider images (base64 placeholders - small colored rectangles)
-const DUMMY_SLIDERS = [
-  { id: '1', color: '#8B4513', text: 'Selamat Datang di Paroki Tomang' },
-  { id: '2', color: '#A0522D', text: 'Jadwal Misa & Acara' },
-  { id: '3', color: '#CD853F', text: 'Pelayanan Gereja' },
-  { id: '4', color: '#D2691E', text: 'Renungan Harian' },
-  { id: '5', color: '#8B6914', text: 'Kegiatan Mendatang' },
+// Default fallback jika collection sliders kosong
+const DEFAULT_INFO_SLIDES = [
+  {
+    id: '1',
+    title: 'Jadwal Misa',
+    description: 'Lihat jadwal misa harian & mingguan',
+    icon: 'calendar-outline',
+  },
+  {
+    id: '2',
+    title: 'Renungan',
+    description: 'Renungan harian untuk memperkuat iman',
+    icon: 'book-outline',
+  },
+  {
+    id: '3',
+    title: 'Kegiatan',
+    description: 'Informasi acara & kegiatan paroki',
+    icon: 'megaphone-outline',
+  },
+  {
+    id: '4',
+    title: 'Kontak',
+    description: 'Hubungi sekretariat & layanan paroki',
+    icon: 'call-outline',
+  },
 ];
 
-// Menu items based on screenshot
-const MENU_ITEMS = [
+// Menu items default (fallback jika Firestore belum ada data)
+const DEFAULT_MENU_ITEMS = [
   {
     id: '1',
     title: 'Misa Gereja & Intensi Misa',
@@ -66,9 +85,25 @@ const MENU_ITEMS = [
 
 export default function Index() {
   const router = useRouter();
-  const [activeSlide, setActiveSlide] = useState(0);
-  const flatListRef = useRef<FlatList>(null);
   const { width: windowWidth } = useWindowDimensions();
+  const [sliders, setSliders] = useState<SliderItem[]>([]);
+  const [pages, setPages] = useState<PageContent[]>([]);
+
+  useEffect(() => {
+    const load = async () => {
+      const data = await getActiveSliders();
+      setSliders(data);
+    };
+    load();
+  }, []);
+
+  useEffect(() => {
+    const loadPages = async () => {
+      const data = await getActivePages();
+      setPages(data);
+    };
+    loadPages();
+  }, []);
   
   // Calculate number of columns based on current window width
   const numColumns = windowWidth >= 1024 ? 5 : windowWidth >= 768 ? 4 : 3;
@@ -78,27 +113,9 @@ export default function Index() {
   const itemWidthPercent = (100 / numColumns) - (marginPercent * 2);
   const itemWidth = `${itemWidthPercent}%`;
 
-  // Auto-play slider
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveSlide((prev) => {
-        const next = (prev + 1) % DUMMY_SLIDERS.length;
-        flatListRef.current?.scrollToIndex({ index: next, animated: true });
-        return next;
-      });
-    }, 4000);
-    return () => clearInterval(interval);
-  }, []);
-
   const handleMenuPress = (route: string) => {
     router.push(route);
   };
-
-  const renderSlideItem = ({ item }: { item: typeof DUMMY_SLIDERS[0] }) => (
-    <View style={[styles.slide, { backgroundColor: item.color, width: windowWidth - 32 }]}>
-      <Text style={styles.slideText}>{item.text}</Text>
-    </View>
-  );
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -107,66 +124,127 @@ export default function Index() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerContent}>
-            <Ionicons name="home" size={28} color="#fff" />
-            <Text style={styles.headerTitle}>Paroki Tomang</Text>
+        {/* Top bar */}
+        <View style={styles.topBar}>
+          <View>
+            <Text style={styles.topBarLabel}>Paroki</Text>
+            <View style={styles.topBarRow}>
+              <Ionicons name="location-outline" size={16} color="#FFF5E0" />
+              <Text style={styles.topBarTitle}>Santa Maria Bunda Karmel</Text>
+            </View>
+          </View>
+          <View style={styles.avatar}>
+            <Ionicons name="person" size={20} color="#8B4513" />
           </View>
         </View>
 
-        {/* Slider Section */}
-        <View style={styles.sliderContainer}>
-          <FlatList
-            ref={flatListRef}
-            data={DUMMY_SLIDERS}
-            renderItem={renderSlideItem}
-            keyExtractor={(item) => item.id}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={(event) => {
-              const slideSize = event.nativeEvent.layoutMeasurement.width;
-              const index = Math.round(event.nativeEvent.contentOffset.x / slideSize);
-              setActiveSlide(index);
-            }}
-            getItemLayout={(data, index) => ({
-              length: windowWidth - 32,
-              offset: (windowWidth - 32) * index,
-              index,
-            })}
-            style={styles.flatList}
-          />
-          <View style={styles.pagination}>
-            {DUMMY_SLIDERS.map((_, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.dot,
-                  index === activeSlide && styles.activeDot,
-                ]}
-              />
-            ))}
+        {/* Hero card ala modern app */}
+        <View style={styles.heroCard}>
+          <View style={styles.heroLeft}>
+            <Text style={styles.heroChip}>Hari Ini</Text>
+            <Text style={styles.heroMainTitle}>Selamat Datang di Paroki Tomang</Text>
+            <Text style={styles.heroMainSubtitle}>
+              Temukan jadwal misa, pelayanan gereja, renungan harian, dan informasi penting lain.
+            </Text>
+            <View style={styles.heroStatsRow}>
+              <View style={styles.heroStat}>
+                <Text style={styles.heroStatLabel}>Jadwal Misa</Text>
+                <Text style={styles.heroStatValue}>Lihat</Text>
+              </View>
+              <View style={styles.heroStatDivider} />
+              <View style={styles.heroStat}>
+                <Text style={styles.heroStatLabel}>Pelayanan</Text>
+                <Text style={styles.heroStatValue}>Aktif</Text>
+              </View>
+            </View>
           </View>
+        </View>
+
+        {/* Slider kecil di bawah hero */}
+        <View style={styles.infoSliderContainer}>
+          <FlatList
+            data={sliders.length ? sliders : DEFAULT_INFO_SLIDES}
+            horizontal
+            keyExtractor={(item) => item.id}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.infoSliderContent}
+            renderItem={({ item }) => {
+              const hasImage =
+                'imageBase64' in item && Boolean((item as any).imageBase64);
+              const imageUri = hasImage ? (item as any).imageBase64 : undefined;
+
+              return (
+                <View style={styles.infoSlideCard}>
+                  {hasImage ? (
+                    <Image
+                      source={{ uri: imageUri }}
+                      style={styles.infoSlideImageBackground}
+                    />
+                  ) : (
+                    <View style={styles.infoSlideIconCentered}>
+                      <View style={styles.infoSlideIconWrapper}>
+                        <Ionicons
+                          name={
+                            (item.icon || 'information-circle-outline') as any
+                          }
+                          size={24}
+                          color="#8B4513"
+                        />
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Bottom info card overlay */}
+                  <View style={styles.infoSlideOverlay}>
+                    <View style={styles.infoSlideTopRow}>
+                      <Text style={styles.infoSlideLabel} numberOfLines={1}>
+                        {item.title}
+                      </Text>
+                    </View>
+                    {!!item.description && (
+                      <Text
+                        style={styles.infoSlideDescription}
+                        numberOfLines={2}
+                      >
+                        {item.description}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              );
+            }}
+          />
         </View>
 
         {/* Menu Grid */}
         <View style={styles.menuSection}>
           <Text style={styles.sectionTitle}>Menu Utama</Text>
           <View style={styles.menuGrid}>
-            {MENU_ITEMS.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={[styles.menuItem, { width: itemWidth }]}
-                onPress={() => handleMenuPress(item.route)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.menuIconContainer}>
-                  <Ionicons name={item.icon as any} size={28} color="#8B4513" />
-                </View>
-                <Text style={styles.menuTitle}>{item.title}</Text>
-              </TouchableOpacity>
-            ))}
+            {(pages.length ? pages : DEFAULT_MENU_ITEMS).map((item) => {
+              const title = 'title' in item ? item.title : (item as any).title;
+              const iconName =
+                'icon' in item ? (item as any).icon : (item as any).icon;
+              const slug =
+                'slug' in item ? (item as any).slug : (item as any).slug;
+              const route =
+                'route' in item && (item as any).route
+                  ? (item as any).route
+                  : `/pages/${slug}`;
+
+              return (
+                <TouchableOpacity
+                  key={item.id || slug}
+                  style={[styles.menuItem, { width: itemWidth }]}
+                  onPress={() => handleMenuPress(route)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.menuIconContainer}>
+                    <Ionicons name={iconName as any} size={28} color="#8B4513" />
+                  </View>
+                  <Text style={styles.menuTitle}>{title}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
@@ -189,59 +267,120 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 24,
+    paddingBottom: 32,
+    paddingTop: 24,
+    paddingHorizontal: 16,
   },
-  header: {
-    backgroundColor: '#8B4513',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  headerContent: {
+  topBarLabel: {
+    fontSize: 12,
+    color: '#A67C52',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  topBarRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    marginTop: 4,
+    gap: 4,
   },
-  headerTitle: {
-    fontSize: 22,
+  topBarTitle: {
+    fontSize: 18,
     fontWeight: '700',
-    color: '#fff',
-    letterSpacing: 0.5,
+    color: '#5D4037',
   },
-  sliderContainer: {
-    height: 220,
-    backgroundColor: '#fff',
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 16,
-    overflow: 'hidden',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  flatList: {
-    height: 220,
-  },
-  slide: {
-    height: 220,
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFE4C4',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  slideText: {
-    fontSize: 24,
+  heroCard: {
+    backgroundColor: '#8B4513',
+    borderRadius: 24,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    marginBottom: 20,
+    overflow: 'hidden',
+  },
+  heroLeft: {
+    flex: 1,
+  },
+  heroChip: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    color: '#FFF5E0',
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  heroMainTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  heroMainSubtitle: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.9)',
+    marginBottom: 14,
+  },
+  heroStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  heroStat: {
+    flex: 1,
+  },
+  heroStatLabel: {
+    fontSize: 10,
+    color: '#FDEBD0',
+  },
+  heroStatValue: {
+    fontSize: 12,
     fontWeight: '700',
-    color: '#fff',
-    textAlign: 'center',
-    paddingHorizontal: 24,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
+    color: '#FFFFFF',
+    marginTop: 2,
+  },
+  heroStatDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    marginHorizontal: 8,
+  },
+  heroRight: {
+    flex: 1.2,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  illustrationBubble: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  illustrationHill: {
+    width: 110,
+    height: 40,
+    borderRadius: 999,
+    backgroundColor: '#A0522D',
   },
   dot: {
     backgroundColor: 'rgba(255, 255, 255, 0.4)',
@@ -266,8 +405,75 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   menuSection: {
-    marginTop: 24,
+    marginTop: 12,
+  },
+  infoSliderContainer: {
+    marginBottom: 12,
+    marginTop: 4,
+  },
+  infoSliderContent: {
+    paddingVertical: 4,
+  },
+  infoSlideCard: {
+    width: 240,
+    height: 150,
+    marginRight: 12,
+    borderRadius: 22,
+    overflow: 'hidden',
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  infoSlideImageBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    resizeMode: 'cover',
+  },
+  infoSlideIconCentered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 24,
+    backgroundColor: '#FFF5E0',
+  },
+  infoSlideIconWrapper: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFE4C4',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  infoSlideOverlay: {
+    position: 'absolute',
+    left: 8,
+    right: 8,
+    bottom: 8,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.96)',
     paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  infoSlideTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  infoSlideLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#5D4037',
+    marginBottom: 4,
+  },
+  infoSlideDescription: {
+    fontSize: 11,
+    color: '#7A5A3A',
   },
   sectionTitle: {
     fontSize: 20,
