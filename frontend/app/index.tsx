@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SliderItem, getActiveSliders } from '../services/sliders.service';
 import { PageContent, getActivePages } from '../services/pages.service';
+import { useAuth } from '../contexts/AuthContext';
 
 // Default fallback jika collection sliders kosong
 const DEFAULT_INFO_SLIDES = [
@@ -86,6 +87,7 @@ const DEFAULT_MENU_ITEMS = [
 export default function Index() {
   const router = useRouter();
   const { width: windowWidth } = useWindowDimensions();
+  const { user } = useAuth();
   const [sliders, setSliders] = useState<SliderItem[]>([]);
   const [pages, setPages] = useState<PageContent[]>([]);
 
@@ -117,6 +119,10 @@ export default function Index() {
     router.push(route);
   };
 
+  const handleAvatarPress = () => {
+    router.push('/adm');
+  };
+
   const handleSliderPress = (item: SliderItem) => {
     if (item.targetType === 'page' && item.targetPageSlug) {
       router.push(`/pages/${item.targetPageSlug}`);
@@ -140,16 +146,13 @@ export default function Index() {
       >
         {/* Top bar */}
         <View style={styles.topBar}>
-          <View>
-            <Text style={styles.topBarLabel}>Paroki</Text>
-            <View style={styles.topBarRow}>
-              <Ionicons name="location-outline" size={16} color="#FFF5E0" />
-              <Text style={styles.topBarTitle}>Santa Maria Bunda Karmel</Text>
-            </View>
+          <View style={styles.topBarRow}>
+            <Ionicons name="location-outline" size={16} color="#FFF5E0" />
+            <Text style={styles.topBarTitle}>Paroki Santa Maria Bunda Karmel</Text>
           </View>
-          <View style={styles.avatar}>
+          <TouchableOpacity style={styles.avatar} onPress={handleAvatarPress}>
             <Ionicons name="person" size={20} color="#8B4513" />
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* Hero card ala modern app */}
@@ -236,7 +239,6 @@ export default function Index() {
 
         {/* Menu Grid */}
         <View style={styles.menuSection}>
-          <Text style={styles.sectionTitle}>Menu Utama</Text>
           <View style={styles.menuGrid}>
             {(pages.length ? pages : DEFAULT_MENU_ITEMS).map((item) => {
               const title = 'title' in item ? item.title : (item as any).title;
