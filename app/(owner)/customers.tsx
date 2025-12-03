@@ -32,17 +32,56 @@ export default function CustomersScreen() {
 
   const loadCustomers = async () => {
     try {
-      const { data, error } = await supabase
+      // Ambil data customers dengan packages
+      const { data: customersData, error: customersError } = await supabase
         .from('customers')
         .select(`
           *,
-          packages:package_id(name, speed_mbps, price_monthly),
-          user_profiles:sales_id(full_name)
+          packages:package_id(name, speed_mbps, price_monthly)
         `)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setCustomers(data || []);
+      if (customersError) throw customersError;
+
+      if (!customersData || customersData.length === 0) {
+        setCustomers([]);
+        return;
+      }
+
+      // Ambil semua unique sales_id
+      const salesIds = [...new Set(customersData.map(c => c.sales_id).filter(Boolean))];
+      
+      // Ambil data user_profiles untuk semua sales
+      const { data: salesProfiles, error: profilesError } = await supabase
+        .from('user_profiles')
+        .select('user_id, full_name')
+        .in('user_id', salesIds);
+
+      if (profilesError) {
+        console.error('Error loading sales profiles:', profilesError);
+        // Tetap tampilkan customers meskipun error loading profiles
+        setCustomers(customersData.map(customer => ({
+          ...customer,
+          user_profiles: undefined,
+        })));
+        return;
+      }
+
+      // Buat map untuk lookup cepat
+      const salesProfilesMap: Record<string, { full_name: string | null }> = {};
+      if (salesProfiles) {
+        salesProfiles.forEach(profile => {
+          salesProfilesMap[profile.user_id] = { full_name: profile.full_name };
+        });
+      }
+
+      // Gabungkan data
+      const customersWithSales = customersData.map(customer => ({
+        ...customer,
+        user_profiles: salesProfilesMap[customer.sales_id] || { full_name: null },
+      }));
+
+      setCustomers(customersWithSales);
     } catch (error) {
       console.error('Error loading customers:', error);
     } finally {

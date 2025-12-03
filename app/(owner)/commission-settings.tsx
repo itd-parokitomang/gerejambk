@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, ActivityIndicator, TextInput, Alert, Modal, Pressable } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, ActivityIndicator, TextInput, Alert, Modal, Pressable, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ios16Components, ios16Palette, ios16Radii, ios16Spacing, ios16Typography } from '@/constants/ios16TemplateStyles';
 
 type CommissionSetting = {
@@ -32,8 +33,16 @@ export default function CommissionSettingsScreen() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [sales, setSales] = useState<Sales[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingSetting, setEditingSetting] = useState<CommissionSetting | null>(null);
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [showSalesDropdown, setShowSalesDropdown] = useState(false);
+  const [formErrors, setFormErrors] = useState({
+    customer_id: '',
+    sales_id: '',
+    percentage: '',
+  });
   const [formData, setFormData] = useState({
     customer_id: '',
     sales_id: '',
@@ -46,17 +55,46 @@ export default function CommissionSettingsScreen() {
 
   const loadData = async () => {
     try {
-      // Load commission settings
+      // Load commission settings dengan customers (ada foreign key langsung)
       const { data: settingsData, error: settingsError } = await supabase
         .from('commission_settings')
         .select(`
           *,
-          customers:customer_id(name),
-          user_profiles:sales_id(full_name)
+          customers:customer_id(name)
         `)
         .order('created_at', { ascending: false });
 
       if (settingsError) throw settingsError;
+
+      // Ambil semua unique sales_id dari settings
+      const salesIds = settingsData 
+        ? [...new Set(settingsData.map(s => s.sales_id).filter(Boolean))]
+        : [];
+      
+      // Ambil data user_profiles untuk semua sales
+      let salesProfilesMap: Record<string, { full_name: string | null }> = {};
+      if (salesIds.length > 0) {
+        const { data: salesProfiles, error: profilesError } = await supabase
+          .from('user_profiles')
+          .select('user_id, full_name')
+          .in('user_id', salesIds);
+
+        if (profilesError) {
+          console.error('Error loading sales profiles:', profilesError);
+        } else if (salesProfiles) {
+          salesProfiles.forEach(profile => {
+            salesProfilesMap[profile.user_id] = { full_name: profile.full_name };
+          });
+        }
+      }
+
+      // Gabungkan data settings dengan sales profiles
+      const settingsWithSales = settingsData 
+        ? settingsData.map(setting => ({
+            ...setting,
+            user_profiles: salesProfilesMap[setting.sales_id] || { full_name: null },
+          }))
+        : [];
 
       // Load customers
       const { data: customersData, error: customersError } = await supabase
@@ -74,7 +112,7 @@ export default function CommissionSettingsScreen() {
 
       if (salesError) throw salesError;
 
-      setSettings(settingsData || []);
+      setSettings(settingsWithSales);
       setCustomers(customersData || []);
       setSales(salesData || []);
     } catch (error) {
@@ -86,17 +124,65 @@ export default function CommissionSettingsScreen() {
   };
 
   const handleSave = async () => {
-    if (!formData.customer_id || !formData.sales_id || !formData.percentage) {
-      Alert.alert('Error', 'Semua field harus diisi');
+    console.log('handleSave called', { formData, editingSetting });
+    
+    // Tutup dropdown jika masih terbuka
+    setShowCustomerDropdown(false);
+    setShowSalesDropdown(false);
+
+    // Reset errors
+    const errors = {
+      customer_id: '',
+      sales_id: '',
+      percentage: '',
+    };
+    let hasError = false;
+
+    // Validasi dengan feedback visual
+    if (!formData.customer_id) {
+      errors.customer_id = 'Pilih pelanggan terlebih dahulu';
+      hasError = true;
+    }
+
+    if (!formData.sales_id) {
+      errors.sales_id = 'Pilih sales terlebih dahulu';
+      hasError = true;
+    }
+
+    if (!formData.percentage || formData.percentage.trim() === '') {
+      errors.percentage = 'Masukkan persentase komisi';
+      hasError = true;
+    } else {
+      const percentage = parseFloat(formData.percentage.trim());
+      
+      if (isNaN(percentage)) {
+        errors.percentage = 'Persentase harus berupa angka';
+        hasError = true;
+      } else if (percentage < 0 || percentage > 100) {
+        errors.percentage = 'Persentase harus antara 0-100';
+        hasError = true;
+      }
+    }
+
+    // Set errors untuk ditampilkan
+    setFormErrors(errors);
+
+    if (hasError) {
+      // Scroll ke field pertama yang error
+      Alert.alert('Error', 'Mohon lengkapi semua field yang wajib diisi');
       return;
     }
 
-    const percentage = parseFloat(formData.percentage);
-    if (percentage < 0 || percentage > 100) {
-      Alert.alert('Error', 'Persentase harus antara 0-100');
-      return;
-    }
+    // Clear errors jika validasi berhasil
+    setFormErrors({
+      customer_id: '',
+      sales_id: '',
+      percentage: '',
+    });
 
+    const percentage = parseFloat(formData.percentage.trim());
+
+    setIsSaving(true);
     try {
       const settingData = {
         customer_id: formData.customer_id,
@@ -104,23 +190,48 @@ export default function CommissionSettingsScreen() {
         percentage: percentage,
       };
 
+      console.log('Saving commission setting:', settingData);
+      console.log('Setting data to insert/update:', JSON.stringify(settingData, null, 2));
+
       if (editingSetting) {
-        const { error } = await supabase
+        console.log('Updating existing setting with id:', editingSetting.id);
+        const { data, error } = await supabase
           .from('commission_settings')
           .update(settingData)
-          .eq('id', editingSetting.id);
-        if (error) throw error;
+          .eq('id', editingSetting.id)
+          .select();
+        if (error) {
+          console.error('Update error:', error);
+          console.error('Error details:', JSON.stringify(error, null, 2));
+          throw error;
+        }
+        console.log('Update success:', data);
+        Alert.alert('Berhasil', 'Pengaturan komisi berhasil diperbarui');
       } else {
-        const { error } = await supabase.from('commission_settings').insert(settingData);
-        if (error) throw error;
+        console.log('Inserting new setting');
+        const { data, error } = await supabase
+          .from('commission_settings')
+          .insert(settingData)
+          .select();
+        if (error) {
+          console.error('Insert error:', error);
+          console.error('Error details:', JSON.stringify(error, null, 2));
+          throw error;
+        }
+        console.log('Insert success:', data);
+        Alert.alert('Berhasil', 'Pengaturan komisi berhasil ditambahkan');
       }
 
       setIsModalVisible(false);
       resetForm();
       await loadData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving commission setting:', error);
-      Alert.alert('Error', 'Gagal menyimpan pengaturan komisi');
+      console.error('Full error object:', JSON.stringify(error, null, 2));
+      const errorMessage = error?.message || error?.details || 'Gagal menyimpan pengaturan komisi';
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -160,6 +271,8 @@ export default function CommissionSettingsScreen() {
 
   const resetForm = () => {
     setEditingSetting(null);
+    setShowCustomerDropdown(false);
+    setShowSalesDropdown(false);
     setFormData({
       customer_id: '',
       sales_id: '',
@@ -222,10 +335,23 @@ export default function CommissionSettingsScreen() {
           </Card>
         ))}
 
-        <Modal visible={isModalVisible} animationType="slide" transparent>
+        <Modal 
+          visible={isModalVisible} 
+          animationType="slide" 
+          transparent
+          onRequestClose={() => {
+            setIsModalVisible(false);
+            resetForm();
+          }}
+        >
           <View style={styles.modalOverlay}>
             <Card style={styles.modalContent}>
-              <ScrollView>
+              <ScrollView
+                onScrollBeginDrag={() => {
+                  setShowCustomerDropdown(false);
+                  setShowSalesDropdown(false);
+                }}
+              >
                 <Text style={[ios16Typography.largeTitle, styles.modalTitle]}>
                   {editingSetting ? 'Edit Pengaturan Komisi' : 'Tambah Pengaturan Komisi'}
                 </Text>
@@ -233,64 +359,174 @@ export default function CommissionSettingsScreen() {
                 <View style={styles.form}>
                   <View style={styles.field}>
                     <Text style={ios16Typography.subheadline}>Pelanggan *</Text>
-                    <View style={styles.selectContainer}>
-                      {customers.map((customer) => (
-                        <Pressable
-                          key={customer.id}
-                          style={[
-                            styles.selectOption,
-                            formData.customer_id === customer.id && styles.selectOptionActive,
-                          ]}
-                          onPress={() => setFormData({ ...formData, customer_id: customer.id })}
-                        >
-                          <Text
-                            style={[
-                              ios16Typography.body,
-                              formData.customer_id === customer.id && styles.selectOptionTextActive,
-                            ]}
-                          >
-                            {customer.name}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
+                    <Pressable
+                      style={[
+                        styles.dropdown,
+                        formErrors.customer_id && styles.dropdownError
+                      ]}
+                      onPress={() => {
+                        setShowSalesDropdown(false);
+                        setShowCustomerDropdown(!showCustomerDropdown);
+                        // Clear error saat user mulai memilih
+                        if (formErrors.customer_id) {
+                          setFormErrors({ ...formErrors, customer_id: '' });
+                        }
+                      }}
+                    >
+                      <Text style={[
+                        ios16Typography.body,
+                        styles.dropdownText,
+                        !formData.customer_id && styles.dropdownPlaceholder
+                      ]}>
+                        {formData.customer_id 
+                          ? customers.find(c => c.id === formData.customer_id)?.name || 'Pilih Pelanggan'
+                          : 'Pilih Pelanggan'}
+                      </Text>
+                      <IconSymbol
+                        name="chevron.down"
+                        size={20}
+                        color={ios16Palette.textPrimaryLight80}
+                        style={[
+                          styles.dropdownIcon,
+                          showCustomerDropdown && styles.dropdownIconOpen
+                        ]}
+                      />
+                    </Pressable>
+                    {formErrors.customer_id ? (
+                      <Text style={styles.errorText}>{formErrors.customer_id}</Text>
+                    ) : null}
+                    {showCustomerDropdown && (
+                      <View style={styles.dropdownList}>
+                        <ScrollView style={styles.dropdownScroll} nestedScrollEnabled>
+                          {customers.map((customer) => (
+                            <TouchableOpacity
+                              key={customer.id}
+                              style={[
+                                styles.dropdownItem,
+                                formData.customer_id === customer.id && styles.dropdownItemActive,
+                              ]}
+                              onPress={() => {
+                                setFormData({ ...formData, customer_id: customer.id });
+                                setShowCustomerDropdown(false);
+                                // Clear error saat sudah memilih
+                                if (formErrors.customer_id) {
+                                  setFormErrors({ ...formErrors, customer_id: '' });
+                                }
+                              }}
+                            >
+                              <Text
+                                style={[
+                                  ios16Typography.body,
+                                  styles.dropdownItemText,
+                                  formData.customer_id === customer.id && styles.dropdownItemTextActive,
+                                ]}
+                              >
+                                {customer.name}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    )}
                   </View>
 
                   <View style={styles.field}>
                     <Text style={ios16Typography.subheadline}>Sales *</Text>
-                    <View style={styles.selectContainer}>
-                      {sales.map((sale) => (
-                        <Pressable
-                          key={sale.id}
-                          style={[
-                            styles.selectOption,
-                            formData.sales_id === sale.user_id && styles.selectOptionActive,
-                          ]}
-                          onPress={() => setFormData({ ...formData, sales_id: sale.user_id })}
-                        >
-                          <Text
-                            style={[
-                              ios16Typography.body,
-                              formData.sales_id === sale.user_id && styles.selectOptionTextActive,
-                            ]}
-                          >
-                            {sale.full_name || 'N/A'}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
+                    <Pressable
+                      style={[
+                        styles.dropdown,
+                        formErrors.sales_id && styles.dropdownError
+                      ]}
+                      onPress={() => {
+                        setShowCustomerDropdown(false);
+                        setShowSalesDropdown(!showSalesDropdown);
+                        // Clear error saat user mulai memilih
+                        if (formErrors.sales_id) {
+                          setFormErrors({ ...formErrors, sales_id: '' });
+                        }
+                      }}
+                    >
+                      <Text style={[
+                        ios16Typography.body,
+                        styles.dropdownText,
+                        !formData.sales_id && styles.dropdownPlaceholder
+                      ]}>
+                        {formData.sales_id 
+                          ? sales.find(s => s.user_id === formData.sales_id)?.full_name || 'Pilih Sales'
+                          : 'Pilih Sales'}
+                      </Text>
+                      <IconSymbol
+                        name="chevron.down"
+                        size={20}
+                        color={ios16Palette.textPrimaryLight80}
+                        style={[
+                          styles.dropdownIcon,
+                          showSalesDropdown && styles.dropdownIconOpen
+                        ]}
+                      />
+                    </Pressable>
+                    {formErrors.sales_id ? (
+                      <Text style={styles.errorText}>{formErrors.sales_id}</Text>
+                    ) : null}
+                    {showSalesDropdown && (
+                      <View style={styles.dropdownList}>
+                        <ScrollView style={styles.dropdownScroll} nestedScrollEnabled>
+                          {sales.map((sale) => (
+                            <TouchableOpacity
+                              key={sale.id}
+                              style={[
+                                styles.dropdownItem,
+                                formData.sales_id === sale.user_id && styles.dropdownItemActive,
+                              ]}
+                              onPress={() => {
+                                setFormData({ ...formData, sales_id: sale.user_id });
+                                setShowSalesDropdown(false);
+                                // Clear error saat sudah memilih
+                                if (formErrors.sales_id) {
+                                  setFormErrors({ ...formErrors, sales_id: '' });
+                                }
+                              }}
+                            >
+                              <Text
+                                style={[
+                                  ios16Typography.body,
+                                  styles.dropdownItemText,
+                                  formData.sales_id === sale.user_id && styles.dropdownItemTextActive,
+                                ]}
+                              >
+                                {sale.full_name || 'N/A'}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    )}
                   </View>
 
                   <View style={styles.field}>
                     <Text style={ios16Typography.subheadline}>Persentase Komisi (%) *</Text>
                     <TextInput
-                      style={styles.input}
+                      style={[
+                        styles.input,
+                        formErrors.percentage && styles.inputError
+                      ]}
                       value={formData.percentage}
-                      onChangeText={(text) => setFormData({ ...formData, percentage: text })}
+                      onChangeText={(text) => {
+                        console.log('Percentage input changed:', text);
+                        setFormData({ ...formData, percentage: text });
+                        // Clear error saat user mulai mengetik
+                        if (formErrors.percentage) {
+                          setFormErrors({ ...formErrors, percentage: '' });
+                        }
+                      }}
                       keyboardType="numeric"
                       placeholder="10"
                       placeholderTextColor={ios16Palette.textQuaternaryLight}
+                      returnKeyType="done"
                     />
+                    {formErrors.percentage ? (
+                      <Text style={styles.errorText}>{formErrors.percentage}</Text>
+                    ) : null}
                   </View>
 
                   <View style={styles.actions}>
@@ -302,8 +538,15 @@ export default function CommissionSettingsScreen() {
                       }}
                       variant="secondary"
                       style={styles.actionButton}
+                      disabled={isSaving}
                     />
-                    <Button title="Simpan" onPress={handleSave} style={styles.actionButton} />
+                    <Button 
+                      title={isSaving ? 'Menyimpan...' : 'Simpan'} 
+                      onPress={handleSave} 
+                      style={styles.actionButton}
+                      loading={isSaving}
+                      disabled={isSaving}
+                    />
                   </View>
                 </View>
               </ScrollView>
@@ -391,22 +634,73 @@ const styles = StyleSheet.create({
     color: ios16Palette.textPrimaryLight80,
     fontSize: 11,
   },
-  selectContainer: {
-    gap: ios16Spacing.xs,
-  },
-  selectOption: {
-    padding: ios16Spacing.md,
-    borderRadius: ios16Radii.card,
+  dropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: ios16Palette.backgroundMutedLight,
+    borderRadius: ios16Radii.card,
+    paddingHorizontal: ios16Spacing.md,
+    paddingVertical: ios16Spacing.md,
     borderWidth: 1,
-    borderColor: 'transparent',
+    borderColor: ios16Palette.borderLight,
+    minHeight: 44,
   },
-  selectOptionActive: {
-    borderColor: ios16Palette.accentBlue,
+  dropdownText: {
+    flex: 1,
+    color: ios16Palette.textPrimaryLight80,
+  },
+  dropdownPlaceholder: {
+    color: ios16Palette.textQuaternaryLight,
+  },
+  dropdownIcon: {
+    transform: [{ rotate: '0deg' }],
+    marginLeft: ios16Spacing.xs,
+  },
+  dropdownIconOpen: {
+    transform: [{ rotate: '180deg' }],
+  },
+  dropdownList: {
+    marginTop: ios16Spacing.xs,
+    backgroundColor: ios16Palette.backgroundMutedLight,
+    borderRadius: ios16Radii.card,
+    borderWidth: 1,
+    borderColor: ios16Palette.borderLight,
+    maxHeight: 200,
+    overflow: 'hidden',
+    zIndex: 1,
+  },
+  dropdownScroll: {
+    maxHeight: 200,
+  },
+  dropdownItem: {
+    paddingHorizontal: ios16Spacing.md,
+    paddingVertical: ios16Spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: ios16Palette.borderLight,
+  },
+  dropdownItemActive: {
     backgroundColor: ios16Palette.accentBlue + '20',
   },
-  selectOptionTextActive: {
+  dropdownItemText: {
+    color: ios16Palette.textPrimaryLight80,
+  },
+  dropdownItemTextActive: {
     color: ios16Palette.accentBlue,
+    fontWeight: '600',
+  },
+  dropdownError: {
+    borderColor: '#FF3B30',
+    borderWidth: 2,
+  },
+  inputError: {
+    borderColor: '#FF3B30',
+    borderWidth: 2,
+  },
+  errorText: {
+    color: '#FF3B30',
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 4,
   },
 });
-

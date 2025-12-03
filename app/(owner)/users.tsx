@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Header } from '@/components/header';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ios16Components, ios16Palette, ios16Spacing, ios16Typography, ios16Radii } from '@/constants/ios16TemplateStyles';
 import { formatDate } from '@/lib/utils/date-utils';
 import { useAuth } from '@/hooks/use-auth';
@@ -26,6 +27,7 @@ export default function UsersScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
   
   // Form state
   const [formData, setFormData] = useState({
@@ -35,28 +37,39 @@ export default function UsersScreen() {
     role: 'sales' as UserRole,
   });
 
+  const toggleUser = (userId: string) => {
+    setExpandedUsers((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(userId)) {
+        newSet.delete(userId);
+      } else {
+        newSet.add(userId);
+      }
+      return newSet;
+    });
+  };
+
   useEffect(() => {
     loadUsers();
   }, []);
 
   const loadUsers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // Gunakan database function untuk mendapatkan users dengan email
+      const { data, error } = await supabase.rpc('get_users_with_email');
 
       if (error) throw error;
 
-      // Get emails from auth.users
       if (data) {
-        const usersWithEmail = await Promise.all(
-          data.map(async (user) => {
-            const { data: authUser } = await supabase.auth.admin.getUserById(user.user_id);
-            return { ...user, email: authUser?.user?.email };
-          })
-        );
-        setUsers(usersWithEmail);
+        // Sort by created_at descending
+        const sortedData = [...data].sort((a, b) => {
+          const dateA = new Date(a.created_at).getTime();
+          const dateB = new Date(b.created_at).getTime();
+          return dateB - dateA;
+        });
+        setUsers(sortedData);
+      } else {
+        setUsers([]);
       }
     } catch (error) {
       console.error('Error loading users:', error);
@@ -157,28 +170,72 @@ export default function UsersScreen() {
           style={styles.addButton}
         />
 
-        {users.map((user) => (
-          <Card key={user.id} style={styles.userCard}>
-            <View style={styles.userInfo}>
-              <Text style={[ios16Typography.headline, styles.userName]}>
-                {user.full_name || 'Tidak ada nama'}
-              </Text>
-              <Text style={[ios16Typography.caption, styles.userEmail]}>{user.email}</Text>
-              <View style={styles.userMeta}>
-                <Text style={[ios16Typography.caption, styles.role]}>Role: {user.role}</Text>
-                <Text style={[ios16Typography.caption, styles.date]}>
-                  Dibuat: {formatDate(user.created_at)}
-                </Text>
-              </View>
-            </View>
-            <Button
-              title="Hapus"
-              onPress={() => handleDeleteUser(user.id, user.full_name || 'User')}
-              variant="secondary"
-              style={styles.deleteButton}
-            />
-          </Card>
-        ))}
+        {users.map((user) => {
+          const isExpanded = expandedUsers.has(user.id);
+          return (
+            <Card key={user.id} style={styles.userCard}>
+              <Pressable
+                style={styles.userHeader}
+                onPress={() => toggleUser(user.id)}
+                android_ripple={{ color: ios16Palette.backgroundMutedLight }}
+              >
+                <View style={styles.userHeaderContent}>
+                  <IconSymbol
+                    name="chevron.right"
+                    size={16}
+                    color={ios16Palette.textPrimaryLight80}
+                    style={[
+                      styles.chevronIcon,
+                      isExpanded && styles.chevronIconExpanded,
+                    ]}
+                  />
+                  <Text style={[ios16Typography.headline, styles.userName]}>
+                    {user.full_name || 'Tidak ada nama'}
+                  </Text>
+                </View>
+              </Pressable>
+
+              {isExpanded && (
+                <View style={styles.userDetails}>
+                  <View style={styles.detailRow}>
+                    <Text style={[ios16Typography.caption, styles.detailLabel]}>Email:</Text>
+                    <Text style={[ios16Typography.caption, styles.detailValue]}>
+                      {user.email || 'Tidak ada email'}
+                    </Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={[ios16Typography.caption, styles.detailLabel]}>Role:</Text>
+                    <Text style={[ios16Typography.caption, styles.roleBadge]}>
+                      {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                    </Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={[ios16Typography.caption, styles.detailLabel]}>Dibuat:</Text>
+                    <Text style={[ios16Typography.caption, styles.detailValue]}>
+                      {formatDate(user.created_at)}
+                    </Text>
+                  </View>
+                  {user.phone && (
+                    <View style={styles.detailRow}>
+                      <Text style={[ios16Typography.caption, styles.detailLabel]}>Telepon:</Text>
+                      <Text style={[ios16Typography.caption, styles.detailValue]}>
+                        {user.phone}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.deleteButtonContainer}>
+                    <Button
+                      title="Hapus"
+                      onPress={() => handleDeleteUser(user.id, user.full_name || 'User')}
+                      variant="secondary"
+                      style={styles.deleteButton}
+                    />
+                  </View>
+                </View>
+              )}
+            </Card>
+          );
+        })}
 
         {users.length === 0 && (
           <Card>
@@ -299,8 +356,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: ios16Spacing.lg,
-    gap: ios16Spacing.md,
+    paddingHorizontal: ios16Spacing.xs,
+    paddingVertical: ios16Spacing.xs,
+    gap: ios16Spacing.xs,
   },
   loadingContainer: {
     flex: 1,
@@ -308,35 +366,62 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   userCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: ios16Spacing.md,
+    overflow: 'hidden',
   },
-  userInfo: {
-    flex: 1,
+  userHeader: {
+    paddingVertical: ios16Spacing.xs,
+    paddingHorizontal: ios16Spacing.xs,
+  },
+  userHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: ios16Spacing.xs,
+  },
+  chevronIcon: {
+    transform: [{ rotate: '0deg' }],
+    transition: 'transform 0.2s',
+  },
+  chevronIconExpanded: {
+    transform: [{ rotate: '90deg' }],
   },
   userName: {
     color: ios16Palette.textPrimaryLight80,
+    flex: 1,
   },
-  userEmail: {
-    color: ios16Palette.textPrimaryLight80,
+  userDetails: {
+    paddingHorizontal: ios16Spacing.xs,
+    paddingBottom: ios16Spacing.xs,
+    gap: ios16Spacing.xxs,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: ios16Palette.borderLight,
+    marginTop: ios16Spacing.xxs,
+    paddingTop: ios16Spacing.xs,
   },
-  userMeta: {
+  detailRow: {
     flexDirection: 'row',
-    gap: ios16Spacing.md,
-    marginTop: ios16Spacing.xs,
+    alignItems: 'center',
+    gap: ios16Spacing.xs,
   },
-  role: {
-    color: ios16Palette.accentBlue,
-  },
-  date: {
+  detailLabel: {
     color: ios16Palette.textQuaternaryLight,
+    minWidth: 60,
+  },
+  detailValue: {
+    color: ios16Palette.textPrimaryLight80,
+    flex: 1,
+  },
+  roleBadge: {
+    color: ios16Palette.accentBlue,
+    fontWeight: '600',
+  },
+  deleteButtonContainer: {
+    marginTop: ios16Spacing.xxs,
+    paddingTop: ios16Spacing.xs,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: ios16Palette.borderLight,
   },
   deleteButton: {
-    width: 'auto',
-    minWidth: 80,
+    width: '100%',
   },
   emptyText: {
     textAlign: 'center',
@@ -344,7 +429,7 @@ const styles = StyleSheet.create({
     padding: ios16Spacing.xl,
   },
   addButton: {
-    marginBottom: ios16Spacing.md,
+    marginBottom: ios16Spacing.xs,
   },
   modalContainer: {
     flex: 1,

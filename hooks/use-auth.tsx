@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -38,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const initialLoadComplete = useRef(false);
 
   const fetchProfile = useCallback(async (userId: string) => {
     try {
@@ -95,33 +97,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    // Get initial session
+    const completeInitialLoad = () => {
+      if (mounted && !initialLoadComplete.current) {
+        initialLoadComplete.current = true;
+        setIsLoading(false);
+      }
+    };
+
+    // Get initial session - hanya set isLoading false setelah initial load
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return;
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
         loadProfile(session.user.id).finally(() => {
-          if (mounted) setIsLoading(false);
+          completeInitialLoad();
         });
       } else {
-        setIsLoading(false);
+        completeInitialLoad();
       }
     });
 
-    // Listen for auth changes
+    // Listen for auth changes - JANGAN set isLoading di sini
+    // karena ini dipanggil setiap kali ada perubahan auth state (termasuk navigasi)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!mounted) return;
+      
+      // Update session dan user tanpa mengubah isLoading
       setSession(session);
       setUser(session?.user ?? null);
+      
       if (session?.user) {
         await loadProfile(session.user.id);
       } else {
         setProfile(null);
       }
-      if (mounted) setIsLoading(false);
+      
+      // Hanya set isLoading false jika initial load belum selesai
+      // Ini untuk handle edge case jika onAuthStateChange dipanggil sebelum getSession selesai
+      completeInitialLoad();
     });
 
     return () => {
@@ -160,6 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           full_name: payload.fullName,
           role: payload.role || 'sales',
           phone: null,
+          email: payload.email,
         });
 
       if (profileError) {
@@ -253,6 +270,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             full_name: payload.fullName,
             role: payload.role,
             phone: null,
+            email: payload.email,
           });
 
         if (profileError) {
@@ -280,6 +298,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             full_name: payload.fullName,
             role: payload.role,
             phone: null,
+            email: payload.email,
           });
 
         if (profileError) {

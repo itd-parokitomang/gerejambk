@@ -32,18 +32,57 @@ export default function CommissionsScreen() {
 
   const loadCommissions = async () => {
     try {
-      const { data, error } = await supabase
+      // Ambil data commissions dengan customers (ada foreign key langsung)
+      const { data: commissionsData, error: commissionsError } = await supabase
         .from('commissions')
         .select(`
           *,
-          user_profiles:sales_id(full_name),
           customers:customer_id(name)
         `)
         .order('created_at', { ascending: false })
         .limit(100);
 
-      if (error) throw error;
-      setCommissions(data || []);
+      if (commissionsError) throw commissionsError;
+
+      if (!commissionsData || commissionsData.length === 0) {
+        setCommissions([]);
+        return;
+      }
+
+      // Ambil semua unique sales_id
+      const salesIds = [...new Set(commissionsData.map(c => c.sales_id).filter(Boolean))];
+      
+      // Ambil data user_profiles untuk semua sales
+      const { data: salesProfiles, error: profilesError } = await supabase
+        .from('user_profiles')
+        .select('user_id, full_name')
+        .in('user_id', salesIds);
+
+      if (profilesError) {
+        console.error('Error loading sales profiles:', profilesError);
+        // Tetap tampilkan commissions meskipun error loading profiles
+        setCommissions(commissionsData.map(commission => ({
+          ...commission,
+          user_profiles: undefined,
+        })));
+        return;
+      }
+
+      // Buat map untuk lookup cepat
+      const salesProfilesMap: Record<string, { full_name: string | null }> = {};
+      if (salesProfiles) {
+        salesProfiles.forEach(profile => {
+          salesProfilesMap[profile.user_id] = { full_name: profile.full_name };
+        });
+      }
+
+      // Gabungkan data
+      const commissionsWithSales = commissionsData.map(commission => ({
+        ...commission,
+        user_profiles: salesProfilesMap[commission.sales_id] || { full_name: null },
+      }));
+
+      setCommissions(commissionsWithSales);
     } catch (error) {
       console.error('Error loading commissions:', error);
     } finally {

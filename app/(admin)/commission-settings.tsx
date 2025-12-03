@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, ActivityIndicator, TextInput, Alert, Modal, Pressable } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, ActivityIndicator, TextInput, Alert, Modal, Pressable, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ios16Components, ios16Palette, ios16Radii, ios16Spacing, ios16Typography } from '@/constants/ios16TemplateStyles';
 
 type CommissionSetting = {
@@ -34,6 +35,8 @@ export default function CommissionSettingsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingSetting, setEditingSetting] = useState<CommissionSetting | null>(null);
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [showSalesDropdown, setShowSalesDropdown] = useState(false);
   const [formData, setFormData] = useState({
     customer_id: '',
     sales_id: '',
@@ -46,17 +49,46 @@ export default function CommissionSettingsScreen() {
 
   const loadData = async () => {
     try {
-      // Load commission settings
+      // Load commission settings dengan customers (ada foreign key langsung)
       const { data: settingsData, error: settingsError } = await supabase
         .from('commission_settings')
         .select(`
           *,
-          customers:customer_id(name),
-          user_profiles:sales_id(full_name)
+          customers:customer_id(name)
         `)
         .order('created_at', { ascending: false });
 
       if (settingsError) throw settingsError;
+
+      // Ambil semua unique sales_id dari settings
+      const salesIds = settingsData 
+        ? [...new Set(settingsData.map(s => s.sales_id).filter(Boolean))]
+        : [];
+      
+      // Ambil data user_profiles untuk semua sales
+      let salesProfilesMap: Record<string, { full_name: string | null }> = {};
+      if (salesIds.length > 0) {
+        const { data: salesProfiles, error: profilesError } = await supabase
+          .from('user_profiles')
+          .select('user_id, full_name')
+          .in('user_id', salesIds);
+
+        if (profilesError) {
+          console.error('Error loading sales profiles:', profilesError);
+        } else if (salesProfiles) {
+          salesProfiles.forEach(profile => {
+            salesProfilesMap[profile.user_id] = { full_name: profile.full_name };
+          });
+        }
+      }
+
+      // Gabungkan data settings dengan sales profiles
+      const settingsWithSales = settingsData 
+        ? settingsData.map(setting => ({
+            ...setting,
+            user_profiles: salesProfilesMap[setting.sales_id] || { full_name: null },
+          }))
+        : [];
 
       // Load customers
       const { data: customersData, error: customersError } = await supabase
@@ -74,7 +106,7 @@ export default function CommissionSettingsScreen() {
 
       if (salesError) throw salesError;
 
-      setSettings(settingsData || []);
+      setSettings(settingsWithSales);
       setCustomers(customersData || []);
       setSales(salesData || []);
     } catch (error) {
@@ -160,6 +192,8 @@ export default function CommissionSettingsScreen() {
 
   const resetForm = () => {
     setEditingSetting(null);
+    setShowCustomerDropdown(false);
+    setShowSalesDropdown(false);
     setFormData({
       customer_id: '',
       sales_id: '',
@@ -233,52 +267,120 @@ export default function CommissionSettingsScreen() {
                 <View style={styles.form}>
                   <View style={styles.field}>
                     <Text style={ios16Typography.subheadline}>Pelanggan *</Text>
-                    <View style={styles.selectContainer}>
-                      {customers.map((customer) => (
-                        <Pressable
-                          key={customer.id}
-                          style={[
-                            styles.selectOption,
-                            formData.customer_id === customer.id && styles.selectOptionActive,
-                          ]}
-                          onPress={() => setFormData({ ...formData, customer_id: customer.id })}
-                        >
-                          <Text
-                            style={[
-                              ios16Typography.body,
-                              formData.customer_id === customer.id && styles.selectOptionTextActive,
-                            ]}
-                          >
-                            {customer.name}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
+                    <Pressable
+                      style={styles.dropdown}
+                      onPress={() => {
+                        setShowSalesDropdown(false);
+                        setShowCustomerDropdown(!showCustomerDropdown);
+                      }}
+                    >
+                      <Text style={[
+                        ios16Typography.body,
+                        styles.dropdownText,
+                        !formData.customer_id && styles.dropdownPlaceholder
+                      ]}>
+                        {formData.customer_id 
+                          ? customers.find(c => c.id === formData.customer_id)?.name || 'Pilih Pelanggan'
+                          : 'Pilih Pelanggan'}
+                      </Text>
+                      <IconSymbol
+                        name="chevron.down"
+                        size={20}
+                        color={ios16Palette.textPrimaryLight80}
+                        style={[
+                          styles.dropdownIcon,
+                          showCustomerDropdown && styles.dropdownIconOpen
+                        ]}
+                      />
+                    </Pressable>
+                    {showCustomerDropdown && (
+                      <View style={styles.dropdownList}>
+                        <ScrollView style={styles.dropdownScroll} nestedScrollEnabled>
+                          {customers.map((customer) => (
+                            <TouchableOpacity
+                              key={customer.id}
+                              style={[
+                                styles.dropdownItem,
+                                formData.customer_id === customer.id && styles.dropdownItemActive,
+                              ]}
+                              onPress={() => {
+                                setFormData({ ...formData, customer_id: customer.id });
+                                setShowCustomerDropdown(false);
+                              }}
+                            >
+                              <Text
+                                style={[
+                                  ios16Typography.body,
+                                  styles.dropdownItemText,
+                                  formData.customer_id === customer.id && styles.dropdownItemTextActive,
+                                ]}
+                              >
+                                {customer.name}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    )}
                   </View>
 
                   <View style={styles.field}>
                     <Text style={ios16Typography.subheadline}>Sales *</Text>
-                    <View style={styles.selectContainer}>
-                      {sales.map((sale) => (
-                        <Pressable
-                          key={sale.id}
-                          style={[
-                            styles.selectOption,
-                            formData.sales_id === sale.user_id && styles.selectOptionActive,
-                          ]}
-                          onPress={() => setFormData({ ...formData, sales_id: sale.user_id })}
-                        >
-                          <Text
-                            style={[
-                              ios16Typography.body,
-                              formData.sales_id === sale.user_id && styles.selectOptionTextActive,
-                            ]}
-                          >
-                            {sale.full_name || 'N/A'}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
+                    <Pressable
+                      style={styles.dropdown}
+                      onPress={() => {
+                        setShowCustomerDropdown(false);
+                        setShowSalesDropdown(!showSalesDropdown);
+                      }}
+                    >
+                      <Text style={[
+                        ios16Typography.body,
+                        styles.dropdownText,
+                        !formData.sales_id && styles.dropdownPlaceholder
+                      ]}>
+                        {formData.sales_id 
+                          ? sales.find(s => s.user_id === formData.sales_id)?.full_name || 'Pilih Sales'
+                          : 'Pilih Sales'}
+                      </Text>
+                      <IconSymbol
+                        name="chevron.down"
+                        size={20}
+                        color={ios16Palette.textPrimaryLight80}
+                        style={[
+                          styles.dropdownIcon,
+                          showSalesDropdown && styles.dropdownIconOpen
+                        ]}
+                      />
+                    </Pressable>
+                    {showSalesDropdown && (
+                      <View style={styles.dropdownList}>
+                        <ScrollView style={styles.dropdownScroll} nestedScrollEnabled>
+                          {sales.map((sale) => (
+                            <TouchableOpacity
+                              key={sale.id}
+                              style={[
+                                styles.dropdownItem,
+                                formData.sales_id === sale.user_id && styles.dropdownItemActive,
+                              ]}
+                              onPress={() => {
+                                setFormData({ ...formData, sales_id: sale.user_id });
+                                setShowSalesDropdown(false);
+                              }}
+                            >
+                              <Text
+                                style={[
+                                  ios16Typography.body,
+                                  styles.dropdownItemText,
+                                  formData.sales_id === sale.user_id && styles.dropdownItemTextActive,
+                                ]}
+                              >
+                                {sale.full_name || 'N/A'}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    )}
                   </View>
 
                   <View style={styles.field}>
@@ -391,22 +493,59 @@ const styles = StyleSheet.create({
     color: ios16Palette.textPrimaryLight80,
     fontSize: 11,
   },
-  selectContainer: {
-    gap: ios16Spacing.xs,
-  },
-  selectOption: {
-    padding: ios16Spacing.md,
-    borderRadius: ios16Radii.card,
+  dropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: ios16Palette.backgroundMutedLight,
+    borderRadius: ios16Radii.card,
+    paddingHorizontal: ios16Spacing.md,
+    paddingVertical: ios16Spacing.md,
     borderWidth: 1,
-    borderColor: 'transparent',
+    borderColor: ios16Palette.borderLight,
+    minHeight: 44,
   },
-  selectOptionActive: {
-    borderColor: ios16Palette.accentBlue,
+  dropdownText: {
+    flex: 1,
+    color: ios16Palette.textPrimaryLight80,
+  },
+  dropdownPlaceholder: {
+    color: ios16Palette.textQuaternaryLight,
+  },
+  dropdownIcon: {
+    transform: [{ rotate: '0deg' }],
+    marginLeft: ios16Spacing.xs,
+  },
+  dropdownIconOpen: {
+    transform: [{ rotate: '180deg' }],
+  },
+  dropdownList: {
+    marginTop: ios16Spacing.xs,
+    backgroundColor: ios16Palette.backgroundMutedLight,
+    borderRadius: ios16Radii.card,
+    borderWidth: 1,
+    borderColor: ios16Palette.borderLight,
+    maxHeight: 200,
+    overflow: 'hidden',
+  },
+  dropdownScroll: {
+    maxHeight: 200,
+  },
+  dropdownItem: {
+    paddingHorizontal: ios16Spacing.md,
+    paddingVertical: ios16Spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: ios16Palette.borderLight,
+  },
+  dropdownItemActive: {
     backgroundColor: ios16Palette.accentBlue + '20',
   },
-  selectOptionTextActive: {
+  dropdownItemText: {
+    color: ios16Palette.textPrimaryLight80,
+  },
+  dropdownItemTextActive: {
     color: ios16Palette.accentBlue,
+    fontWeight: '600',
   },
 });
 
