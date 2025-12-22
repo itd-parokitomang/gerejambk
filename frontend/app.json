@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "paroki-tomang",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "primaryColor": "#8B4513",
     "ios": {
       "supportsTablet": true,
@@ -39,7 +39,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/splash-image.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#8B4513"
@@ -54,8 +54,9 @@
         "origin": false
       },
       "eas": {
-        "projectId": "paroki-tomang"
+        "projectId": "d551edd7-eafb-4235-af64-9448522caae5"
       }
-    }
+    },
+    "owner": "koncoweb"
   }
 }

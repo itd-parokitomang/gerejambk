@@ -13,7 +13,15 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { getAppSettings, updateAppSettings, AppSettings } from '../../services/settings.service';
+import {
+  AppSettings,
+  getAppSettings,
+  getMassScheduleHeroConfig,
+  MassScheduleHeroConfig,
+  MassScheduleHeroTargetType,
+  updateAppSettings,
+  upsertMassScheduleHeroConfig,
+} from '../../services/settings.service';
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -27,6 +35,13 @@ export default function SettingsPage() {
     secondaryColor: '#D2691E',
     updatedAt: null,
   });
+  const [massScheduleHero, setMassScheduleHero] = useState<MassScheduleHeroConfig>({
+    title: 'Jadwal Misa',
+    value: 'Lihat',
+    targetType: 'page',
+    targetPageSlug: 'misa',
+    updatedAt: null,
+  });
 
   useEffect(() => {
     loadSettings();
@@ -34,10 +49,9 @@ export default function SettingsPage() {
 
   const loadSettings = async () => {
     try {
-      const data = await getAppSettings();
-      if (data) {
-        setSettings(data);
-      }
+      const [data, hero] = await Promise.all([getAppSettings(), getMassScheduleHeroConfig()]);
+      if (data) setSettings(data);
+      if (hero) setMassScheduleHero(hero);
     } catch {
       Alert.alert('Error', 'Gagal memuat settings');
     } finally {
@@ -88,7 +102,18 @@ export default function SettingsPage() {
 
     setSaving(true);
     try {
-      await updateAppSettings(settings);
+      await Promise.all([
+        updateAppSettings(settings),
+        upsertMassScheduleHeroConfig({
+          title: massScheduleHero.title,
+          value: massScheduleHero.value,
+          targetType: massScheduleHero.targetType,
+          targetPageSlug:
+            massScheduleHero.targetType === 'page' ? massScheduleHero.targetPageSlug : undefined,
+          targetUrl:
+            massScheduleHero.targetType === 'url' ? massScheduleHero.targetUrl : undefined,
+        }),
+      ]);
       Alert.alert('Success', 'Settings berhasil disimpan');
     } catch {
       Alert.alert('Error', 'Gagal menyimpan settings');
@@ -242,6 +267,103 @@ export default function SettingsPage() {
         </View>
       </View>
 
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Hero Beranda</Text>
+        <Text style={styles.sectionDesc}>
+          Atur kartu ringkas “Jadwal Misa / Lihat” di bagian hero beranda.
+        </Text>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Judul</Text>
+          <TextInput
+            style={styles.input}
+            value={massScheduleHero.title}
+            onChangeText={(text) =>
+              setMassScheduleHero((prev) => ({
+                ...prev,
+                title: text,
+              }))
+            }
+            placeholder="Contoh: Jadwal Misa"
+          />
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Nilai</Text>
+          <TextInput
+            style={styles.input}
+            value={massScheduleHero.value}
+            onChangeText={(text) =>
+              setMassScheduleHero((prev) => ({
+                ...prev,
+                value: text,
+              }))
+            }
+            placeholder="Contoh: Lihat"
+          />
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Aksi Klik</Text>
+          <View style={styles.chipRow}>
+            {(['none', 'page', 'url'] as const).map((type) => {
+              const active = massScheduleHero.targetType === type;
+              const label = type === 'none' ? 'Tidak ada' : type === 'page' ? 'Buka Halaman' : 'Buka URL';
+              return (
+                <TouchableOpacity
+                  key={type}
+                  style={[styles.chip, active && styles.chipActive]}
+                  onPress={() =>
+                    setMassScheduleHero((prev) => ({
+                      ...prev,
+                      targetType: type as MassScheduleHeroTargetType,
+                    }))
+                  }
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        {massScheduleHero.targetType === 'page' && (
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Slug Halaman</Text>
+            <TextInput
+              style={styles.input}
+              value={massScheduleHero.targetPageSlug || ''}
+              onChangeText={(text) =>
+                setMassScheduleHero((prev) => ({
+                  ...prev,
+                  targetPageSlug: text,
+                }))
+              }
+              placeholder="Contoh: misa"
+              autoCapitalize="none"
+            />
+          </View>
+        )}
+
+        {massScheduleHero.targetType === 'url' && (
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>URL</Text>
+            <TextInput
+              style={styles.input}
+              value={massScheduleHero.targetUrl || ''}
+              onChangeText={(text) =>
+                setMassScheduleHero((prev) => ({
+                  ...prev,
+                  targetUrl: text,
+                }))
+              }
+              placeholder="Contoh: /pages/misa atau https://example.com"
+              autoCapitalize="none"
+            />
+          </View>
+        )}
+      </View>
+
       {/* Save Button */}
       <View style={styles.buttonContainer}>
         <TouchableOpacity
@@ -390,6 +512,31 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 15,
     color: '#333',
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    backgroundColor: '#F5F5F5',
+  },
+  chipActive: {
+    backgroundColor: '#FFF8F0',
+    borderColor: '#8B4513',
+  },
+  chipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#666',
+  },
+  chipTextActive: {
+    color: '#8B4513',
   },
   buttonContainer: {
     padding: 24,

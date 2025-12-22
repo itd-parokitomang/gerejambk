@@ -12,7 +12,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import RichTextRenderer from '../../components/common/RichTextRenderer';
@@ -54,7 +54,7 @@ export default function PageDetail() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['bottom']}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#8B4513" />
           <Text style={styles.loadingText}>Memuat halaman...</Text>
@@ -65,8 +65,8 @@ export default function PageDetail() {
 
   if (!page) {
     return (
-      <SafeAreaView style={styles.container} edges={['bottom']}>
-        <View className="placeholderContainer">
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <View style={styles.placeholderContainer}>
           <Ionicons name="alert-circle-outline" size={64} color="#D2691E" />
           <Text style={styles.title}>Halaman tidak ditemukan</Text>
           <Text style={styles.description}>
@@ -78,6 +78,16 @@ export default function PageDetail() {
   }
 
   const isParent = page.type === 'parent';
+  const childColumns = windowWidth >= 1024 ? 3 : windowWidth >= 768 ? 2 : 1;
+  const childGridPaddingX = 16 * 2;
+  const childGridGap = 12;
+  const childCardWidth = Math.max(
+    180,
+    Math.floor(
+      (windowWidth - childGridPaddingX - childGridGap * (childColumns - 1)) /
+        childColumns,
+    ),
+  );
 
   const openYouTubeExternal = (videoId: string) => {
     const url = `https://www.youtube.com/watch?v=${videoId}`;
@@ -106,7 +116,7 @@ export default function PageDetail() {
   // Halaman khusus tipe webview: fullscreen web content (tanpa judul & "Segera hadir")
   if (page.type === 'webview' && page.webviewUrl) {
     return (
-      <SafeAreaView style={styles.container} edges={['bottom']}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <View style={{ flex: 1 }}>
           {Platform.OS === 'web' ? (
             <iframe
@@ -138,11 +148,23 @@ export default function PageDetail() {
   const tableData = page.tableData ?? [];
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <ScrollView style={styles.content}>
         <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backButton}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="arrow-back" size={22} color="#8B4513" />
+          </TouchableOpacity>
           <View style={styles.headerIcon}>
-            <Ionicons name={page.icon as any} size={32} color="#8B4513" />
+            <Ionicons
+              name={(page.icon || 'document-text-outline') as any}
+              size={32}
+              color="#8B4513"
+            />
           </View>
           <View style={styles.headerText}>
             <Text
@@ -167,13 +189,13 @@ export default function PageDetail() {
               {children.map((child) => (
                 <TouchableOpacity
                   key={child.id}
-                  style={styles.card}
-                  onPress={() => router.push(`/pages/${child.slug}`)}
+                  style={[styles.card, { width: childCardWidth }]}
+                  onPress={() => router.push(`/pages/${child.slug}` as Href)}
                   activeOpacity={0.8}
                 >
                   <View style={styles.cardIcon}>
                     <Ionicons
-                      name={child.icon as any}
+                      name={(child.icon || 'document-text-outline') as any}
                       size={24}
                       color="#8B4513"
                     />
@@ -502,6 +524,17 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 12,
   },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: '#F5E6D3',
+  },
   headerIcon: {
     width: 48,
     height: 48,
@@ -550,7 +583,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   card: {
-    width: '100%',
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     paddingHorizontal: 14,

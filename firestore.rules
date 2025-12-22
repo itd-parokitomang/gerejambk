@@ -66,5 +66,10 @@ service cloud.firestore {
       // Hanya admin/superadmin yang boleh membuat, mengubah, dan menghapus slider
       allow write: if isAdmin();
     }
+
+    match /mass_schedule_hero/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
   }
 }

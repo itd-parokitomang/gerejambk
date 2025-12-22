@@ -130,6 +130,17 @@ const DEFAULT_PAGES: Array<Omit<PageContent, 'id' | 'createdAt' | 'updatedAt'>> 
   },
 ];
 
+const buildDefaultPage = (
+  page: Omit<PageContent, 'id' | 'createdAt' | 'updatedAt'>,
+): PageContent => {
+  return {
+    ...page,
+    id: page.slug,
+    createdAt: null as any,
+    updatedAt: null as any,
+  };
+};
+
 // Get all pages (termasuk sub halaman) untuk admin
 export const getAllPages = async (): Promise<PageContent[]> => {
   try {
@@ -157,6 +168,9 @@ export const getActivePages = async (): Promise<PageContent[]> => {
       orderBy('order', 'asc')
     );
     const snapshot = await getDocs(pagesQuery);
+    if (snapshot.empty) {
+      return DEFAULT_PAGES.map(buildDefaultPage);
+    }
     const docs = snapshot.docs.map((doc) => {
       const data = doc.data() as Omit<PageContent, 'id'>;
       return { ...data, id: doc.id };
@@ -165,7 +179,7 @@ export const getActivePages = async (): Promise<PageContent[]> => {
     return docs.filter((page) => !page.parentId);
   } catch (error) {
     console.error('Error getting active pages:', error);
-    return [];
+    return DEFAULT_PAGES.map(buildDefaultPage);
   }
 };
 
@@ -181,10 +195,12 @@ export const getPageBySlug = async (slug: string): Promise<PageContent | null> =
       const doc = snapshot.docs[0];
       return { id: doc.id, ...doc.data() } as PageContent;
     }
-    return null;
+    const fallback = DEFAULT_PAGES.find((p) => p.slug === slug);
+    return fallback ? buildDefaultPage(fallback) : null;
   } catch (error) {
     console.error('Error getting page by slug:', error);
-    return null;
+    const fallback = DEFAULT_PAGES.find((p) => p.slug === slug);
+    return fallback ? buildDefaultPage(fallback) : null;
   }
 };
 

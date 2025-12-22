@@ -12,8 +12,7 @@ export default function RootLayout() {
         <Stack.Screen 
           name="pages/[slug]" 
           options={{ 
-            headerShown: true,
-            headerTitle: 'Back',
+            headerShown: false,
           }} 
         />
       </Stack>

@@ -23,7 +23,7 @@ export default function SliderWebviewScreen() {
 
   if (!decodedUrl) {
     return (
-      <SafeAreaView style={styles.container} edges={['bottom']}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <View style={styles.errorContainer}>
           <Ionicons
             name="alert-circle-outline"
@@ -41,15 +41,10 @@ export default function SliderWebviewScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Ionicons
-            name="arrow-back"
-            size={24}
-            color="#8B4513"
-            onPress={() => router.back()}
-          />
+          <Ionicons name="arrow-back" size={24} color="#8B4513" onPress={() => router.back()} />
           <Text style={styles.headerTitle} numberOfLines={1}>
             {decodedTitle}
           </Text>

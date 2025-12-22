@@ -15,6 +15,18 @@ export interface AppSettings {
 }
 
 const SETTINGS_DOC_ID = 'app_settings';
+const MASS_SCHEDULE_HERO_DOC_ID = 'hero';
+
+export type MassScheduleHeroTargetType = 'none' | 'page' | 'url';
+
+export interface MassScheduleHeroConfig {
+  title: string;
+  value: string;
+  targetType: MassScheduleHeroTargetType;
+  targetPageSlug?: string;
+  targetUrl?: string;
+  updatedAt: any;
+}
 
 // Get app settings
 export const getAppSettings = async (): Promise<AppSettings | null> => {
@@ -65,5 +77,38 @@ export const initializeDefaultSettings = async () => {
     }
   } catch (error) {
     console.error('Error initializing settings:', error);
+  }
+};
+
+export const getMassScheduleHeroConfig = async (): Promise<MassScheduleHeroConfig | null> => {
+  try {
+    const ref = doc(db, 'mass_schedule_hero', MASS_SCHEDULE_HERO_DOC_ID);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return null;
+    return snap.data() as MassScheduleHeroConfig;
+  } catch (error) {
+    console.error('Error getting mass schedule hero config:', error);
+    return null;
+  }
+};
+
+export const upsertMassScheduleHeroConfig = async (
+  config: Omit<MassScheduleHeroConfig, 'updatedAt'>,
+) => {
+  try {
+    const ref = doc(db, 'mass_schedule_hero', MASS_SCHEDULE_HERO_DOC_ID);
+    const payload: Partial<MassScheduleHeroConfig> = {
+      ...config,
+      updatedAt: serverTimestamp(),
+    };
+    Object.keys(payload).forEach((key) => {
+      if ((payload as any)[key] === undefined) {
+        delete (payload as any)[key];
+      }
+    });
+    await setDoc(ref, payload, { merge: true });
+  } catch (error) {
+    console.error('Error upserting mass schedule hero config:', error);
+    throw error;
   }
 };

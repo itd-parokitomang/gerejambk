@@ -14,7 +14,12 @@ import { useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SliderItem, getActiveSliders } from '../services/sliders.service';
 import { PageContent, getActivePages } from '../services/pages.service';
-import { AppSettings, getAppSettings } from '../services/settings.service';
+import {
+  AppSettings,
+  getAppSettings,
+  getMassScheduleHeroConfig,
+  MassScheduleHeroConfig,
+} from '../services/settings.service';
 
 // Default fallback jika collection sliders kosong
 const DEFAULT_INFO_SLIDES: SliderItem[] = [
@@ -106,6 +111,7 @@ export default function Index() {
   const [sliders, setSliders] = useState<SliderItem[]>([]);
   const [pages, setPages] = useState<PageContent[]>([]);
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
+  const [massScheduleHero, setMassScheduleHero] = useState<MassScheduleHeroConfig | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -129,6 +135,14 @@ export default function Index() {
       setAppSettings(data);
     };
     loadSettings();
+  }, []);
+
+  useEffect(() => {
+    const loadHero = async () => {
+      const data = await getMassScheduleHeroConfig();
+      setMassScheduleHero(data);
+    };
+    loadHero();
   }, []);
 
   const primaryColor = appSettings?.primaryColor || '#8B4513';
@@ -164,9 +178,39 @@ export default function Index() {
     }
 
     if (item.targetType === 'url' && item.targetUrl) {
-      // Buka URL apa saja (internal / eksternal) di layar webview fullscreen
-      const encodedUrl = encodeURIComponent(item.targetUrl);
+      const raw = item.targetUrl.trim();
+      if (raw.startsWith('/')) {
+        router.push(raw as Href);
+        return;
+      }
+      const encodedUrl = encodeURIComponent(raw);
       const encodedTitle = encodeURIComponent(item.title || 'Tautan');
+      router.push(`/slider-webview?url=${encodedUrl}&title=${encodedTitle}` as Href);
+    }
+  };
+
+  const effectiveMassHero: MassScheduleHeroConfig = massScheduleHero || {
+    title: 'Jadwal Misa',
+    value: 'Lihat',
+    targetType: 'page',
+    targetPageSlug: 'misa',
+    updatedAt: null as any,
+  };
+
+  const handleMassHeroPress = () => {
+    const cfg = effectiveMassHero;
+    if (cfg.targetType === 'page' && cfg.targetPageSlug) {
+      router.push(`/pages/${cfg.targetPageSlug}` as Href);
+      return;
+    }
+    if (cfg.targetType === 'url' && cfg.targetUrl) {
+      const raw = cfg.targetUrl.trim();
+      if (raw.startsWith('/')) {
+        router.push(raw as Href);
+        return;
+      }
+      const encodedUrl = encodeURIComponent(raw);
+      const encodedTitle = encodeURIComponent(cfg.title || 'Tautan');
       router.push(`/slider-webview?url=${encodedUrl}&title=${encodedTitle}` as Href);
     }
   };
@@ -200,10 +244,17 @@ export default function Index() {
               Temukan jadwal misa, pelayanan gereja, renungan harian, dan informasi penting lain.
             </Text>
             <View style={styles.heroStatsRow}>
-              <View style={styles.heroStat}>
-                <Text style={styles.heroStatLabel}>Jadwal Misa</Text>
-                <Text style={styles.heroStatValue}>Lihat</Text>
-              </View>
+              {effectiveMassHero.targetType === 'none' ? (
+                <View style={styles.heroStat}>
+                  <Text style={styles.heroStatLabel}>{effectiveMassHero.title}</Text>
+                  <Text style={styles.heroStatValue}>{effectiveMassHero.value}</Text>
+                </View>
+              ) : (
+                <TouchableOpacity style={styles.heroStat} activeOpacity={0.8} onPress={handleMassHeroPress}>
+                  <Text style={styles.heroStatLabel}>{effectiveMassHero.title}</Text>
+                  <Text style={styles.heroStatValue}>{effectiveMassHero.value}</Text>
+                </TouchableOpacity>
+              )}
               <View style={styles.heroStatDivider} />
               <View style={styles.heroStat}>
                 <Text style={styles.heroStatLabel}>Pelayanan</Text>
@@ -231,6 +282,8 @@ export default function Index() {
                   style={styles.infoSlideCard}
                   activeOpacity={0.8}
                   onPress={() => handleSliderPress(item as SliderItem)}
+                  accessibilityRole="button"
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
                   {hasImage ? (
                     <Image
@@ -279,7 +332,7 @@ export default function Index() {
             {(pages.length ? pages : DEFAULT_MENU_ITEMS).map((item) => {
               const title = 'title' in item ? item.title : (item as any).title;
               const iconName =
-                'icon' in item ? (item as any).icon : (item as any).icon;
+                ('icon' in item && (item as any).icon) ? (item as any).icon : 'grid-outline';
               const slug =
                 'slug' in item ? (item as any).slug : (item as any).slug;
               const route =
@@ -293,6 +346,8 @@ export default function Index() {
                   style={[styles.menuItem, { width: itemWidth }]}
                   onPress={() => handleMenuPress(route as Href)}
                   activeOpacity={0.7}
+                  accessibilityRole="button"
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                   <View style={styles.menuIconContainer}>
                     <Ionicons name={iconName as any} size={28} color={primaryColor} />
