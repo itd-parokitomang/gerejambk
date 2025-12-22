@@ -15,6 +15,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { SliderItem, getActiveSliders } from '../services/sliders.service';
 import { PageContent, getActivePages } from '../services/pages.service';
 import {
+  getCustomIconById,
+  getCustomIconId,
+  isCustomIconRef,
+} from '../services/icons.service';
+import {
   AppSettings,
   getAppSettings,
   getMassScheduleHeroConfig,
@@ -112,6 +117,7 @@ export default function Index() {
   const [pages, setPages] = useState<PageContent[]>([]);
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [massScheduleHero, setMassScheduleHero] = useState<MassScheduleHeroConfig | null>(null);
+  const [customIcons, setCustomIcons] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const load = async () => {
@@ -144,6 +150,33 @@ export default function Index() {
     };
     loadHero();
   }, []);
+
+  useEffect(() => {
+    const ids = new Set<string>();
+    for (const p of pages) {
+      if (p.icon && isCustomIconRef(p.icon)) ids.add(getCustomIconId(p.icon));
+    }
+    for (const s of sliders) {
+      const icon = (s as any).icon as string | undefined;
+      if (icon && isCustomIconRef(icon)) ids.add(getCustomIconId(icon));
+    }
+    const missing = Array.from(ids).filter((id) => !customIcons[id]);
+    if (missing.length === 0) return;
+    let cancelled = false;
+    Promise.all(missing.map((id) => getCustomIconById(id))).then((docs) => {
+      if (cancelled) return;
+      setCustomIcons((prev) => {
+        const next = { ...prev };
+        docs.forEach((doc, idx) => {
+          if (doc?.icon) next[missing[idx]] = doc.icon;
+        });
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [customIcons, pages, sliders]);
 
   const primaryColor = appSettings?.primaryColor || '#8B4513';
   const headerTitle =

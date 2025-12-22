@@ -3,6 +3,7 @@ import {
   createUserWithEmailAndPassword,
   signOut,
   updateProfile,
+  deleteUser,
   User,
   onAuthStateChanged
 } from 'firebase/auth';
@@ -65,7 +66,7 @@ export const registerAdmin = async (
   email: string,
   password: string,
   displayName: string,
-  createdBy: string
+  _createdBy: string
 ) => {
   try {
     const secondaryAuth = firebaseConfig.getSecondaryAuth();
@@ -90,6 +91,42 @@ export const registerAdmin = async (
     
     return { user, profile: userProfile };
   } catch (error: any) {
+    throw new Error(error.message);
+  }
+};
+
+export const registerPublicAdmin = async (
+  email: string,
+  password: string,
+  displayName: string,
+) => {
+  let createdUser: User | null = null;
+  try {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
+    createdUser = user;
+
+    await updateProfile(user, { displayName });
+
+    const userProfile: UserProfile = {
+      uid: user.uid,
+      email: user.email!,
+      displayName,
+      role: 'admin',
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    await setDoc(doc(db, 'users', user.uid), userProfile);
+    return { user, profile: userProfile };
+  } catch (error: any) {
+    if (createdUser) {
+      try {
+        await deleteUser(createdUser);
+      } catch {
+        await Promise.resolve();
+      }
+    }
     throw new Error(error.message);
   }
 };

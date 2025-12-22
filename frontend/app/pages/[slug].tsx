@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,11 @@ import {
   getChildPages,
   PageContent,
 } from '../../services/pages.service';
+import {
+  getCustomIconById,
+  getCustomIconId,
+  isCustomIconRef,
+} from '../../services/icons.service';
 
 export default function PageDetail() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
@@ -29,6 +34,9 @@ export default function PageDetail() {
   const [children, setChildren] = useState<PageContent[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeVideoIndex, setActiveVideoIndex] = useState(0);
+  const webViewRef = useRef<WebView>(null);
+  const [webViewCanGoBack, setWebViewCanGoBack] = useState(false);
+  const [customIcons, setCustomIcons] = useState<Record<string, string>>({});
   const { width: windowWidth } = useWindowDimensions();
 
   useEffect(() => {
@@ -51,6 +59,35 @@ export default function PageDetail() {
     };
     load();
   }, [slug]);
+
+  useEffect(() => {
+    const ids = new Set<string>();
+    if (page?.icon && isCustomIconRef(page.icon)) {
+      ids.add(getCustomIconId(page.icon));
+    }
+    for (const child of children) {
+      if (child.icon && isCustomIconRef(child.icon)) {
+        ids.add(getCustomIconId(child.icon));
+      }
+    }
+    const missing = Array.from(ids).filter((id) => !customIcons[id]);
+    if (missing.length === 0) return;
+
+    let cancelled = false;
+    Promise.all(missing.map((id) => getCustomIconById(id))).then((docs) => {
+      if (cancelled) return;
+      setCustomIcons((prev) => {
+        const next = { ...prev };
+        docs.forEach((doc, idx) => {
+          if (doc?.icon) next[missing[idx]] = doc.icon;
+        });
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [children, customIcons, page?.icon]);
 
   if (loading) {
     return (
@@ -113,10 +150,65 @@ export default function PageDetail() {
     );
   };
 
+  const backToApp = () => {
+    const canGoBack = (router as any).canGoBack?.();
+    if (canGoBack) {
+      router.back();
+      return;
+    }
+    router.replace('/' as any);
+  };
+
+  const handleWebviewBack = () => {
+    if (Platform.OS !== 'web' && webViewCanGoBack) {
+      webViewRef.current?.goBack();
+      return;
+    }
+    backToApp();
+  };
+
   // Halaman khusus tipe webview: fullscreen web content (tanpa judul & "Segera hadir")
   if (page.type === 'webview' && page.webviewUrl) {
     return (
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={handleWebviewBack}
+            style={styles.backButton}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="arrow-back" size={22} color="#8B4513" />
+          </TouchableOpacity>
+          <View style={styles.headerIcon}>
+            {page.icon && isCustomIconRef(page.icon) ? (
+              customIcons[getCustomIconId(page.icon)] ? (
+                <Image
+                  source={{ uri: customIcons[getCustomIconId(page.icon)] }}
+                  style={styles.headerCustomIcon}
+                />
+              ) : (
+                <Ionicons
+                  name="image-outline"
+                  size={26}
+                  color="#8B4513"
+                />
+              )
+            ) : (
+              <Ionicons
+                name={(page.icon || 'document-text-outline') as any}
+                size={32}
+                color="#8B4513"
+              />
+            )}
+          </View>
+          <View style={styles.headerText}>
+            <Text style={styles.title} numberOfLines={2}>
+              {page.title}
+            </Text>
+          </View>
+        </View>
+
         <View style={{ flex: 1 }}>
           {Platform.OS === 'web' ? (
             <iframe
@@ -132,11 +224,15 @@ export default function PageDetail() {
             />
           ) : (
             <WebView
+              ref={webViewRef}
               style={{ flex: 1 }}
               source={{ uri: page.webviewUrl! }}
               javaScriptEnabled
               domStorageEnabled
               allowsInlineMediaPlayback
+              onNavigationStateChange={(navState) =>
+                setWebViewCanGoBack(Boolean(navState.canGoBack))
+              }
             />
           )}
         </View>
@@ -194,11 +290,26 @@ export default function PageDetail() {
                   activeOpacity={0.8}
                 >
                   <View style={styles.cardIcon}>
-                    <Ionicons
-                      name={(child.icon || 'document-text-outline') as any}
-                      size={24}
-                      color="#8B4513"
-                    />
+                    {child.icon && isCustomIconRef(child.icon) ? (
+                      customIcons[getCustomIconId(child.icon)] ? (
+                        <Image
+                          source={{ uri: customIcons[getCustomIconId(child.icon)] }}
+                          style={styles.cardCustomIcon}
+                        />
+                      ) : (
+                        <Ionicons
+                          name="image-outline"
+                          size={20}
+                          color="#8B4513"
+                        />
+                      )
+                    ) : (
+                      <Ionicons
+                        name={(child.icon || 'document-text-outline') as any}
+                        size={24}
+                        color="#8B4513"
+                      />
+                    )}
                   </View>
                   <Text style={styles.cardTitle}>{child.title}</Text>
                 </TouchableOpacity>
@@ -523,6 +634,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 24,
     paddingBottom: 12,
+    zIndex: 2,
   },
   backButton: {
     width: 40,
@@ -543,6 +655,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+  },
+  headerCustomIcon: {
+    width: 32,
+    height: 32,
+    resizeMode: 'contain',
   },
   headerText: {
     flex: 1,
@@ -603,6 +720,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+  },
+  cardCustomIcon: {
+    width: 20,
+    height: 20,
+    resizeMode: 'contain',
   },
   cardTitle: {
     fontSize: 15,

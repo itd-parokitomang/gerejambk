@@ -23,16 +23,49 @@ service cloud.firestore {
              request.auth.token.email == 'joni@email.com' &&
              !exists(/databases/$(database)/documents/users/$(request.auth.uid));
     }
+
+    function isValidIconDataUrl(value) {
+      return value is string &&
+        value.size() <= 1000000 &&
+        value.matches('^data:image\\/(png|x-icon|vnd\\.microsoft\\.icon);base64,[A-Za-z0-9+/=]+$');
+    }
+
+    function isValidOriginalFileName(value) {
+      return value is string && value.size() > 0 && value.size() <= 200;
+    }
+
+    function isValidIconsCreate() {
+      return request.resource.data.keys().hasOnly(['icon', 'originalFileName', 'uploadedAt', 'uploadedBy']) &&
+        isValidIconDataUrl(request.resource.data.icon) &&
+        isValidOriginalFileName(request.resource.data.originalFileName) &&
+        request.resource.data.uploadedBy == request.auth.uid &&
+        request.resource.data.uploadedAt == request.time;
+    }
+
+    function isValidIconsUpdate() {
+      return request.resource.data.keys().hasOnly(['icon', 'originalFileName', 'uploadedAt', 'uploadedBy']) &&
+        isValidIconDataUrl(request.resource.data.icon) &&
+        isValidOriginalFileName(request.resource.data.originalFileName) &&
+        request.resource.data.uploadedBy == resource.data.uploadedBy &&
+        request.resource.data.uploadedAt == resource.data.uploadedAt;
+    }
     
     // Allow authenticated users to create their own profile on first login
     match /users/{userId} {
       allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
       allow create: if (
-        (isSuperAdmin() || isBootstrapSuperAdmin()) &&
+        (
+          (isSuperAdmin() || isBootstrapSuperAdmin()) &&
+          request.resource.data.role in ['admin', 'superadmin'] &&
+          (!isBootstrapSuperAdmin() || request.resource.data.role == 'superadmin')
+        ) || (
+          isAuthenticated() &&
+          request.auth.uid == userId &&
+          request.resource.data.role == 'admin'
+        )
+      ) && (
         request.resource.data.uid == userId &&
-        request.resource.data.email is string &&
-        request.resource.data.role in ['admin', 'superadmin'] &&
-        (!isBootstrapSuperAdmin() || request.resource.data.role == 'superadmin')
+        request.resource.data.email is string
       );
       allow update: if (
         (isSuperAdmin() && request.resource.data.uid == resource.data.uid) || (
@@ -65,6 +98,14 @@ service cloud.firestore {
 
       // Hanya admin/superadmin yang boleh membuat, mengubah, dan menghapus slider
       allow write: if isAdmin();
+    }
+
+    match /icons/{iconId} {
+      allow get: if true;
+      allow list: if isAdmin();
+      allow create: if isAdmin() && isValidIconsCreate();
+      allow update: if isAdmin() && (resource.data.uploadedBy == request.auth.uid || isSuperAdmin()) && isValidIconsUpdate();
+      allow delete: if isAdmin() && (resource.data.uploadedBy == request.auth.uid || isSuperAdmin());
     }
 
     match /mass_schedule_hero/{docId} {

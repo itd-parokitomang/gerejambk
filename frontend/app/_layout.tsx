@@ -7,6 +7,7 @@ export default function RootLayout() {
     <AuthProvider>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
+        <Stack.Screen name="reg" />
         <Stack.Screen name="adm/index" />
         <Stack.Screen name="adm/dashboard" />
         <Stack.Screen 
