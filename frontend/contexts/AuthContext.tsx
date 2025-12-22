@@ -1,11 +1,10 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
 import { User } from 'firebase/auth';
 import { 
   loginUser, 
   logoutUser, 
   onAuthChange,
-  getCurrentUserProfile,
-  seedSuperAdmin
+  getCurrentUserProfile
 } from '../services/auth.service';
 import { initializeDefaultSettings } from '../services/settings.service';
 import { initializeDefaultPages } from '../services/pages.service';
@@ -25,16 +24,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const didBootstrapRef = useRef(false);
 
   useEffect(() => {
-    // Initialize Firebase data
-    const initialize = async () => {
-      await seedSuperAdmin();
-      await initializeDefaultSettings();
-      await initializeDefaultPages();
-    };
-    initialize();
-
     // Listen to auth state changes
     const unsubscribe = onAuthChange(async (firebaseUser) => {
       setUser(firebaseUser);
@@ -43,8 +35,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Get user profile from Firestore
         const userProfile = await getCurrentUserProfile(firebaseUser.uid);
         setProfile(userProfile);
+
+        if (
+          userProfile &&
+          !didBootstrapRef.current &&
+          (userProfile.role === 'admin' || userProfile.role === 'superadmin')
+        ) {
+          didBootstrapRef.current = true;
+          await initializeDefaultSettings();
+          await initializeDefaultPages();
+        }
       } else {
         setProfile(null);
+        didBootstrapRef.current = false;
       }
       
       setLoading(false);

@@ -10,37 +10,53 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { SliderItem, getActiveSliders } from '../services/sliders.service';
 import { PageContent, getActivePages } from '../services/pages.service';
-import { useAuth } from '../contexts/AuthContext';
+import { AppSettings, getAppSettings } from '../services/settings.service';
 
 // Default fallback jika collection sliders kosong
-const DEFAULT_INFO_SLIDES = [
+const DEFAULT_INFO_SLIDES: SliderItem[] = [
   {
     id: '1',
     title: 'Jadwal Misa',
     description: 'Lihat jadwal misa harian & mingguan',
     icon: 'calendar-outline',
+    order: 0,
+    active: true,
+    createdAt: null as any,
+    updatedAt: null as any,
   },
   {
     id: '2',
     title: 'Renungan',
     description: 'Renungan harian untuk memperkuat iman',
     icon: 'book-outline',
+    order: 1,
+    active: true,
+    createdAt: null as any,
+    updatedAt: null as any,
   },
   {
     id: '3',
     title: 'Kegiatan',
     description: 'Informasi acara & kegiatan paroki',
     icon: 'megaphone-outline',
+    order: 2,
+    active: true,
+    createdAt: null as any,
+    updatedAt: null as any,
   },
   {
     id: '4',
     title: 'Kontak',
     description: 'Hubungi sekretariat & layanan paroki',
     icon: 'call-outline',
+    order: 3,
+    active: true,
+    createdAt: null as any,
+    updatedAt: null as any,
   },
 ];
 
@@ -87,9 +103,9 @@ const DEFAULT_MENU_ITEMS = [
 export default function Index() {
   const router = useRouter();
   const { width: windowWidth } = useWindowDimensions();
-  const { user } = useAuth();
   const [sliders, setSliders] = useState<SliderItem[]>([]);
   const [pages, setPages] = useState<PageContent[]>([]);
+  const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -106,26 +122,44 @@ export default function Index() {
     };
     loadPages();
   }, []);
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      const data = await getAppSettings();
+      setAppSettings(data);
+    };
+    loadSettings();
+  }, []);
+
+  const primaryColor = appSettings?.primaryColor || '#8B4513';
+  const headerTitle =
+    appSettings?.headerText || appSettings?.parokiName || 'Paroki Santa Maria Bunda Karmel';
+  const heroTitle = `Selamat Datang di ${appSettings?.appName || 'Paroki Tomang'}`;
+  const footerLines = (appSettings?.footerText || 'Paroki Santa Maria Bunda Karmel (MBK)\nTomang - Jakarta Barat')
+    .split('\n')
+    .filter((line) => line.trim().length > 0);
   
   // Calculate number of columns based on current window width
   const numColumns = windowWidth >= 1024 ? 5 : windowWidth >= 768 ? 4 : 3;
   
   // Calculate item width dynamically
-  const marginPercent = 1;
-  const itemWidthPercent = (100 / numColumns) - (marginPercent * 2);
-  const itemWidth = `${itemWidthPercent}%`;
+  const gridHorizontalPadding = 16;
+  const menuItemHorizontalMargin = 4;
+  const availableWidth = windowWidth - (gridHorizontalPadding * 2);
+  const itemWidth =
+    (availableWidth / numColumns) - (menuItemHorizontalMargin * 2);
 
-  const handleMenuPress = (route: string) => {
+  const handleMenuPress = (route: Href) => {
     router.push(route);
   };
 
   const handleAvatarPress = () => {
-    router.push('/adm');
+    router.push('/adm' as Href);
   };
 
   const handleSliderPress = (item: SliderItem) => {
     if (item.targetType === 'page' && item.targetPageSlug) {
-      router.push(`/pages/${item.targetPageSlug}`);
+      router.push(`/pages/${item.targetPageSlug}` as Href);
       return;
     }
 
@@ -133,7 +167,7 @@ export default function Index() {
       // Buka URL apa saja (internal / eksternal) di layar webview fullscreen
       const encodedUrl = encodeURIComponent(item.targetUrl);
       const encodedTitle = encodeURIComponent(item.title || 'Tautan');
-      router.push(`/slider-webview?url=${encodedUrl}&title=${encodedTitle}`);
+      router.push(`/slider-webview?url=${encodedUrl}&title=${encodedTitle}` as Href);
     }
   };
 
@@ -148,18 +182,20 @@ export default function Index() {
         <View style={styles.topBar}>
           <View style={styles.topBarRow}>
             <Ionicons name="location-outline" size={16} color="#FFF5E0" />
-            <Text style={styles.topBarTitle}>Paroki Santa Maria Bunda Karmel</Text>
+            <Text style={styles.topBarTitle} numberOfLines={1}>
+              {headerTitle}
+            </Text>
           </View>
           <TouchableOpacity style={styles.avatar} onPress={handleAvatarPress}>
-            <Ionicons name="person" size={20} color="#8B4513" />
+            <Ionicons name="person" size={20} color={primaryColor} />
           </TouchableOpacity>
         </View>
 
         {/* Hero card ala modern app */}
-        <View style={styles.heroCard}>
+        <View style={[styles.heroCard, { backgroundColor: primaryColor }]}>
           <View style={styles.heroLeft}>
             <Text style={styles.heroChip}>Hari Ini</Text>
-            <Text style={styles.heroMainTitle}>Selamat Datang di Paroki Tomang</Text>
+            <Text style={styles.heroMainTitle}>{heroTitle}</Text>
             <Text style={styles.heroMainSubtitle}>
               Temukan jadwal misa, pelayanan gereja, renungan harian, dan informasi penting lain.
             </Text>
@@ -209,7 +245,7 @@ export default function Index() {
                             (item.icon || 'information-circle-outline') as any
                           }
                           size={24}
-                          color="#8B4513"
+                          color={primaryColor}
                         />
                       </View>
                     </View>
@@ -255,11 +291,11 @@ export default function Index() {
                 <TouchableOpacity
                   key={item.id || slug}
                   style={[styles.menuItem, { width: itemWidth }]}
-                  onPress={() => handleMenuPress(route)}
+                  onPress={() => handleMenuPress(route as Href)}
                   activeOpacity={0.7}
                 >
                   <View style={styles.menuIconContainer}>
-                    <Ionicons name={iconName as any} size={28} color="#8B4513" />
+                    <Ionicons name={iconName as any} size={28} color={primaryColor} />
                   </View>
                   <Text style={styles.menuTitle}>{title}</Text>
                 </TouchableOpacity>
@@ -270,8 +306,11 @@ export default function Index() {
 
         {/* Footer Info */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Paroki Santa Maria Bunda Karmel (MBK)</Text>
-          <Text style={styles.footerSubtext}>Tomang - Jakarta Barat</Text>
+          <Text style={styles.footerText}>{footerLines[0] || 'Paroki Santa Maria Bunda Karmel (MBK)'}</Text>
+          {!!footerLines[1] && <Text style={styles.footerSubtext}>{footerLines[1]}</Text>}
+          {footerLines.length > 2 && (
+            <Text style={styles.footerSubtext}>{footerLines.slice(2).join(' ')}</Text>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -515,7 +554,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: 120,
     marginBottom: 8,
-    marginHorizontal: '1%',
+    marginHorizontal: 4,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },

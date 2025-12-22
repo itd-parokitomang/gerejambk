@@ -9,6 +9,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { WebView } from 'react-native-webview';
 
 export default function SliderWebviewScreen() {
   const { url, title } = useLocalSearchParams<{
@@ -65,22 +66,16 @@ export default function SliderWebviewScreen() {
             title={decodedTitle}
           />
         ) : (
-          (() => {
-            // eslint-disable-next-line @typescript-eslint/no-var-requires
-            const { WebView } = require('react-native-webview');
-            return (
-              <WebView
-                source={{ uri: decodedUrl }}
-                style={{ flex: 1 }}
-                startInLoadingState
-                renderLoading={() => (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#8B4513" />
-                  </View>
-                )}
-              />
-            );
-          })()
+          <WebView
+            source={{ uri: decodedUrl }}
+            style={{ flex: 1 }}
+            startInLoadingState
+            renderLoading={() => (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#8B4513" />
+              </View>
+            )}
+          />
         )}
       </View>
     </SafeAreaView>
@@ -117,7 +112,7 @@ const styles = StyleSheet.create({
   iframe: {
     width: '100%',
     height: '100%',
-    border: 'none',
+    borderWidth: 0,
   },
   loadingContainer: {
     flex: 1,

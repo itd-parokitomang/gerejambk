@@ -6,8 +6,13 @@ import {
   User,
   onAuthStateChanged
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';
+import { doc, setDoc, getDoc, serverTimestamp, type Firestore } from 'firebase/firestore';
+import type { Auth } from 'firebase/auth';
+import * as firebaseConfig from '../config/firebase';
+
+const auth = firebaseConfig.auth as Auth;
+const db = firebaseConfig.db as Firestore;
+const SUPERADMIN_EMAIL = 'joni@email.com';
 
 export interface UserProfile {
   uid: string;
@@ -18,53 +23,39 @@ export interface UserProfile {
   updatedAt: any;
 }
 
-// Superadmin credentials
-const SUPERADMIN_EMAIL = 'joni@email.com';
-const SUPERADMIN_PASSWORD = 'joni2#Marjoni';
-
 // Login
 export const loginUser = async (email: string, password: string) => {
   try {
-    console.log('[Auth] Attempting login for:', email);
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
-    console.log('[Auth] Login successful, UID:', user.uid);
     
-    // Get user profile from Firestore
-    let userDoc = await getDoc(doc(db, 'users', user.uid));
-    console.log('[Auth] User profile exists:', userDoc.exists());
-    
-    // If profile doesn't exist, create it (for superadmin first login)
+    const userDoc = await getDoc(doc(db, 'users', user.uid));
+
     if (!userDoc.exists()) {
-      console.log('[Auth] Creating new profile for:', email);
-      const newProfile: UserProfile = {
-        uid: user.uid,
-        email: user.email!,
-        displayName: email === SUPERADMIN_EMAIL ? 'Super Admin' : user.displayName || 'Admin User',
-        role: email === SUPERADMIN_EMAIL ? 'superadmin' : 'admin',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      };
-      
-      try {
-        await setDoc(doc(db, 'users', user.uid), newProfile);
-        console.log('[Auth] Profile created successfully');
-        userDoc = await getDoc(doc(db, 'users', user.uid));
-      } catch (firestoreError: any) {
-        console.error('[Auth] Error creating profile:', firestoreError);
-        throw new Error(`Failed to create profile: ${firestoreError.message}`);
+      if (user.email && user.email.toLowerCase() === SUPERADMIN_EMAIL.toLowerCase()) {
+        const bootstrapProfile: UserProfile = {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName || 'Super Admin',
+          role: 'superadmin',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        };
+        await setDoc(doc(db, 'users', user.uid), bootstrapProfile);
+        return { user, profile: bootstrapProfile };
       }
+
+      await signOut(auth);
+      throw new Error('Akun belum terdaftar sebagai admin. Hubungi superadmin.');
     }
     
     const profileData = userDoc.data() as UserProfile;
-    console.log('[Auth] Profile data:', profileData);
     
     return {
       user,
       profile: profileData
     };
   } catch (error: any) {
-    console.error('[Auth] Login error:', error);
     throw new Error(error.message);
   }
 };
@@ -77,7 +68,8 @@ export const registerAdmin = async (
   createdBy: string
 ) => {
   try {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const secondaryAuth = firebaseConfig.getSecondaryAuth();
+    const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
     const user = userCredential.user;
     
     // Update display name
@@ -94,6 +86,7 @@ export const registerAdmin = async (
     };
     
     await setDoc(doc(db, 'users', user.uid), userProfile);
+    await signOut(secondaryAuth);
     
     return { user, profile: userProfile };
   } catch (error: any) {
@@ -123,18 +116,4 @@ export const getCurrentUserProfile = async (uid: string): Promise<UserProfile | 
 // Auth state listener
 export const onAuthChange = (callback: (user: User | null) => void) => {
   return onAuthStateChanged(auth, callback);
-};
-
-// Seed superadmin account
-// Note: Superadmin must be created manually in Firebase Auth Console first
-// This function only creates the Firestore profile
-export const seedSuperAdmin = async () => {
-  try {
-    // We can't programmatically create Firebase Auth users on client side
-    // Superadmin needs to be created via Firebase Console or manually registered once
-    // This function just ensures the profile exists in Firestore after first login
-    console.log('Superadmin seeding handled on first login');
-  } catch (error) {
-    console.error('Error seeding superadmin:', error);
-  }
 };

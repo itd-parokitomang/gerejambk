@@ -22,7 +22,10 @@ export const getAllUsers = async (): Promise<UserProfile[]> => {
       orderBy('createdAt', 'desc')
     );
     const snapshot = await getDocs(usersQuery);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UserProfile));
+    return snapshot.docs.map((doc) => ({
+      ...(doc.data() as UserProfile),
+      uid: doc.id,
+    }));
   } catch (error) {
     console.error('Error getting users:', error);
     return [];

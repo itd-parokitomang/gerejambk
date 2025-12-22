@@ -38,7 +38,7 @@ export default function SettingsPage() {
       if (data) {
         setSettings(data);
       }
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Gagal memuat settings');
     } finally {
       setLoading(false);
@@ -90,7 +90,7 @@ export default function SettingsPage() {
     try {
       await updateAppSettings(settings);
       Alert.alert('Success', 'Settings berhasil disimpan');
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Gagal menyimpan settings');
     } finally {
       setSaving(false);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, Redirect } from 'expo-router';
 import { useAuth } from '../../contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect } from 'react';
 import SettingsPage from '../../components/admin/SettingsPage';
 import PagesManagement from '../../components/admin/PagesManagement';
 import SliderManagement from '../../components/admin/SliderManagement';

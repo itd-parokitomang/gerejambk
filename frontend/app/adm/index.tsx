@@ -27,7 +27,7 @@ export default function AdminLogin() {
     if (user) {
       router.replace('/adm/dashboard');
     }
-  }, [user]);
+  }, [user, router]);
 
   const handleLogin = async () => {
     if (!email || !password) {

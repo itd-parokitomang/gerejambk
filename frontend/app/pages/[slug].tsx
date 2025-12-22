@@ -14,7 +14,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import RenderHTML from 'react-native-render-html';
+import { WebView } from 'react-native-webview';
+import RichTextRenderer from '../../components/common/RichTextRenderer';
 import {
   getPageBySlug,
   getChildPages,
@@ -120,24 +121,21 @@ export default function PageDetail() {
               title={page.title || 'Embedded page'}
             />
           ) : (
-            (() => {
-              // eslint-disable-next-line @typescript-eslint/no-var-requires
-              const { WebView } = require('react-native-webview');
-              return (
-                <WebView
-                  style={{ flex: 1 }}
-                  source={{ uri: page.webviewUrl! }}
-                  javaScriptEnabled
-                  domStorageEnabled
-                  allowsInlineMediaPlayback
-                />
-              );
-            })()
+            <WebView
+              style={{ flex: 1 }}
+              source={{ uri: page.webviewUrl! }}
+              javaScriptEnabled
+              domStorageEnabled
+              allowsInlineMediaPlayback
+            />
           )}
         </View>
       </SafeAreaView>
     );
   }
+
+  const tableColumns = page.tableColumns ?? [];
+  const tableData = page.tableData ?? [];
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -201,11 +199,14 @@ export default function PageDetail() {
           page.richTextContent ? (
             <View style={styles.staticContentSection}>
               <View style={styles.staticCard}>
-                <RenderHTML
-                  contentWidth={windowWidth - 32}
-                  source={{ html: page.richTextContent }}
-                  baseStyle={styles.staticHtmlBase}
-                />
+                {Platform.OS === 'web' ? (
+                  <RichTextRenderer html={page.richTextContent} />
+                ) : (
+                  <RichTextRenderer
+                    html={page.richTextContent}
+                    contentWidth={windowWidth - 32}
+                  />
+                )}
               </View>
             </View>
           ) : (
@@ -283,9 +284,6 @@ export default function PageDetail() {
                 const [first, ...rest] = page.youtubeVideos!;
                 const active =
                   page.youtubeVideos![activeVideoIndex] ?? first;
-                const featuredThumb =
-                  active.thumbnailUrl ||
-                  `https://img.youtube.com/vi/${active.videoId}/hqdefault.jpg`;
 
                 return (
                   <>
@@ -305,22 +303,15 @@ export default function PageDetail() {
                             title={active.title || 'YouTube video player'}
                           />
                         ) : (
-                          // Di mobile/native gunakan WebView lewat require dinamis
-                          (() => {
-                            // eslint-disable-next-line @typescript-eslint/no-var-requires
-                            const { WebView } = require('react-native-webview');
-                            return (
-                              <WebView
-                                style={styles.videoPlayer}
-                                source={{
-                                  uri: `https://www.youtube.com/embed/${active.videoId}?rel=0&playsinline=1&controls=1`,
-                                }}
-                                javaScriptEnabled
-                                domStorageEnabled
-                                allowsInlineMediaPlayback
-                              />
-                            );
-                          })()
+                          <WebView
+                            style={styles.videoPlayer}
+                            source={{
+                              uri: `https://www.youtube.com/embed/${active.videoId}?rel=0&playsinline=1&controls=1`,
+                            }}
+                            javaScriptEnabled
+                            domStorageEnabled
+                            allowsInlineMediaPlayback
+                          />
                         )}
                       </View>
                       <TouchableOpacity
@@ -398,27 +389,19 @@ export default function PageDetail() {
                     title={page.title || 'Embedded page'}
                   />
                 ) : (
-                  (() => {
-                    // eslint-disable-next-line @typescript-eslint/no-var-requires
-                    const { WebView } = require('react-native-webview');
-                    return (
-                      <WebView
-                        style={styles.webviewPlayer}
-                        source={{ uri: page.webviewUrl! }}
-                        javaScriptEnabled
-                        domStorageEnabled
-                        allowsInlineMediaPlayback
-                      />
-                    );
-                  })()
+                  <WebView
+                    style={styles.webviewPlayer}
+                    source={{ uri: page.webviewUrl! }}
+                    javaScriptEnabled
+                    domStorageEnabled
+                    allowsInlineMediaPlayback
+                  />
                 )}
               </View>
             </View>
           </View>
-        ) : page.type === 'data_table' &&
-            page.tableColumns &&
-            page.tableColumns.length > 0 ? (
-          page.tableData && page.tableData.length > 0 ? (
+        ) : page.type === 'data_table' && tableColumns.length > 0 ? (
+          tableData.length > 0 ? (
             <View style={styles.tableSection}>
               {page.tableTitle && (
                 <Text style={styles.tableTitle}>{page.tableTitle}</Text>
@@ -428,7 +411,7 @@ export default function PageDetail() {
                   <View>
                     {/* Table Header */}
                     <View style={styles.tableHeaderRow}>
-                      {page.tableColumns.map((column) => (
+                      {tableColumns.map((column) => (
                         <View
                           key={column.id}
                           style={[
@@ -443,7 +426,7 @@ export default function PageDetail() {
                       ))}
                     </View>
                     {/* Table Rows */}
-                    {page.tableData.map((row, rowIndex) => (
+                    {tableData.map((row, rowIndex) => (
                       <View
                         key={rowIndex}
                         style={[
@@ -451,7 +434,7 @@ export default function PageDetail() {
                           rowIndex % 2 === 0 && styles.tableRowEven,
                         ]}
                       >
-                        {page.tableColumns.map((column) => (
+                        {tableColumns.map((column) => (
                           <View
                             key={column.id}
                             style={[

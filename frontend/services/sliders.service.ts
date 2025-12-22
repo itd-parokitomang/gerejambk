@@ -47,7 +47,10 @@ export const getAllSliders = async (): Promise<SliderItem[]> => {
       orderBy('order', 'asc'),
     );
     const snapshot = await getDocs(slidersQuery);
-    return snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as SliderItem) }));
+    return snapshot.docs.map((d) => {
+      const data = d.data() as Omit<SliderItem, 'id'>;
+      return { ...data, id: d.id };
+    });
   } catch (error) {
     console.error('Error getting sliders:', error);
     return [];
@@ -63,7 +66,10 @@ export const getActiveSliders = async (): Promise<SliderItem[]> => {
       orderBy('order', 'asc'),
     );
     const snapshot = await getDocs(slidersQuery);
-    return snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as SliderItem) }));
+    return snapshot.docs.map((d) => {
+      const data = d.data() as Omit<SliderItem, 'id'>;
+      return { ...data, id: d.id };
+    });
   } catch (error) {
     console.error('Error getting active sliders:', error);
     return [];

@@ -138,7 +138,10 @@ export const getAllPages = async (): Promise<PageContent[]> => {
       orderBy('order', 'asc')
     );
     const snapshot = await getDocs(pagesQuery);
-    return snapshot.docs.map((doc) => ({ id: doc.id, ...(doc.data() as PageContent) }));
+    return snapshot.docs.map((doc) => {
+      const data = doc.data() as Omit<PageContent, 'id'>;
+      return { ...data, id: doc.id };
+    });
   } catch (error) {
     console.error('Error getting pages:', error);
     return [];
@@ -154,7 +157,10 @@ export const getActivePages = async (): Promise<PageContent[]> => {
       orderBy('order', 'asc')
     );
     const snapshot = await getDocs(pagesQuery);
-    const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...(doc.data() as PageContent) }));
+    const docs = snapshot.docs.map((doc) => {
+      const data = doc.data() as Omit<PageContent, 'id'>;
+      return { ...data, id: doc.id };
+    });
     // Hanya ambil halaman yang bukan sub halaman (tanpa parentId)
     return docs.filter((page) => !page.parentId);
   } catch (error) {
@@ -192,7 +198,10 @@ export const getChildPages = async (parentId: string): Promise<PageContent[]> =>
       orderBy('order', 'asc'),
     );
     const snapshot = await getDocs(pagesQuery);
-    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as PageContent));
+    return snapshot.docs.map((doc) => {
+      const data = doc.data() as Omit<PageContent, 'id'>;
+      return { ...data, id: doc.id };
+    });
   } catch (error) {
     console.error('Error getting child pages:', error);
     return [];

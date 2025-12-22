@@ -18,33 +18,44 @@ service cloud.firestore {
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superadmin';
     }
     
-    // Superadmin berbasis email (untuk login pertama sebelum profile dibuat)
-    function isSuperAdminEmail() {
+    function isBootstrapSuperAdmin() {
       return isAuthenticated() &&
-             request.auth.token.email == 'joni@email.com';
+             request.auth.token.email == 'joni@email.com' &&
+             !exists(/databases/$(database)/documents/users/$(request.auth.uid));
     }
     
     // Allow authenticated users to create their own profile on first login
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.auth.uid == userId;
-      allow update: if isAdmin() || request.auth.uid == userId;
+      allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
+      allow create: if (
+        (isSuperAdmin() || isBootstrapSuperAdmin()) &&
+        request.resource.data.uid == userId &&
+        request.resource.data.email is string &&
+        request.resource.data.role in ['admin', 'superadmin'] &&
+        (!isBootstrapSuperAdmin() || request.resource.data.role == 'superadmin')
+      );
+      allow update: if (
+        (isSuperAdmin() && request.resource.data.uid == resource.data.uid) || (
+          request.auth.uid == userId &&
+          request.resource.data.uid == resource.data.uid &&
+          request.resource.data.email == resource.data.email &&
+          request.resource.data.role == resource.data.role
+        )
+      );
       allow delete: if isSuperAdmin();
     }
     
     match /settings/{settingId} {
       allow read: if true;
       // Settings hanya boleh dikelola dari dashboard admin
-      allow create: if isAdmin() || isSuperAdminEmail();
-      allow update: if isAdmin() || isSuperAdminEmail();
-      allow delete: if isSuperAdmin() || isSuperAdminEmail();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isSuperAdmin();
     }
     
     match /pages/{pageId} {
       allow read: if true;
-      // Admin & superadmin boleh kelola halaman,
-      // plus superadmin berdasarkan email (untuk inisialisasi pertama kali).
-      allow write: if isAdmin() || isSuperAdminEmail();
+      allow write: if isAdmin();
     }
 
     // Slider beranda (digunakan untuk slider kecil di homepage)
@@ -53,7 +64,7 @@ service cloud.firestore {
       allow read: if true;
 
       // Hanya admin/superadmin yang boleh membuat, mengubah, dan menghapus slider
-      allow write: if isAdmin() || isSuperAdminEmail();
+      allow write: if isAdmin();
     }
   }
 }

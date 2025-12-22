@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -11,11 +11,9 @@ import {
   TextInput,
   Platform,
   KeyboardAvoidingView,
+  useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-// Rich text editor hanya digunakan di platform non-web.
-// Import runtime dilakukan secara kondisional supaya tidak memicu error "window is not defined" di web/SSR.
-import type { RichEditor as TRichEditor } from 'react-native-pell-rich-editor';
 import {
   getAllPages,
   createPage,
@@ -26,10 +24,12 @@ import {
 } from '../../services/pages.service';
 import { useAuth } from '../../contexts/AuthContext';
 import { IconPicker } from '../common/IconPicker';
+import RichTextEditor from '../common/RichTextEditor';
+import RichTextRenderer from '../common/RichTextRenderer';
 
 type PageFormData = Omit<PageContent, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>;
 
-const PAGE_TYPES: Array<{ value: PageType; label: string; icon: string }> = [
+const PAGE_TYPES: { value: PageType; label: string; icon: string }[] = [
   { value: 'static', label: 'Halaman Statis', icon: 'document-text' },
   { value: 'parent', label: 'Halaman Induk (Group Menu)', icon: 'albums' },
   { value: 'webview', label: 'WebView', icon: 'globe' },
@@ -40,6 +40,7 @@ const PAGE_TYPES: Array<{ value: PageType; label: string; icon: string }> = [
 
 export default function PagesManagement() {
   const { user } = useAuth();
+  const { width: windowWidth } = useWindowDimensions();
   const [pages, setPages] = useState<PageContent[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -60,7 +61,14 @@ export default function PagesManagement() {
     tableData: undefined,
   });
   const [iconPickerVisible, setIconPickerVisible] = useState(false);
-  const richText = useRef<TRichEditor | null>(null);
+  const [contentMode, setContentMode] = useState<'edit' | 'preview'>('edit');
+  const [autoSaveStatus, setAutoSaveStatus] = useState<
+    'idle' | 'saving' | 'saved' | 'error'
+  >('idle');
+  const [autoSaveAt, setAutoSaveAt] = useState<number | null>(null);
+  const [contentDirty, setContentDirty] = useState(false);
+
+  const modalContentWidth = useMemo(() => Math.max(320, windowWidth - 80), [windowWidth]);
 
   useEffect(() => {
     loadPages();
@@ -71,7 +79,7 @@ export default function PagesManagement() {
       setLoading(true);
       const data = await getAllPages();
       setPages(data);
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Gagal memuat halaman');
     } finally {
       setLoading(false);
@@ -81,6 +89,10 @@ export default function PagesManagement() {
   const handleAddNew = () => {
     setEditingPage(null);
     setParentForNew(null);
+    setContentMode('edit');
+    setAutoSaveStatus('idle');
+    setAutoSaveAt(null);
+    setContentDirty(false);
     setFormData({
       title: '',
       slug: '',
@@ -101,6 +113,10 @@ export default function PagesManagement() {
   const handleAddChild = (parent: PageContent) => {
     setEditingPage(null);
     setParentForNew(parent);
+    setContentMode('edit');
+    setAutoSaveStatus('idle');
+    setAutoSaveAt(null);
+    setContentDirty(false);
     setFormData({
       title: '',
       slug: '',
@@ -215,6 +231,10 @@ export default function PagesManagement() {
   const handleEdit = (page: PageContent) => {
     setEditingPage(page);
     setParentForNew(null);
+    setContentMode('edit');
+    setAutoSaveStatus('idle');
+    setAutoSaveAt(null);
+    setContentDirty(false);
     setFormData({
       title: page.title,
       slug: page.slug,
@@ -236,6 +256,28 @@ export default function PagesManagement() {
     setShowModal(true);
   };
 
+  useEffect(() => {
+    if (!showModal) return;
+    if (!editingPage) return;
+    if (formData.type !== 'static') return;
+    if (!contentDirty) return;
+
+    const content = formData.richTextContent || '';
+    const timer = setTimeout(async () => {
+      setAutoSaveStatus('saving');
+      try {
+        await updatePage(editingPage.id, { richTextContent: content });
+        setAutoSaveStatus('saved');
+        setAutoSaveAt(Date.now());
+        setContentDirty(false);
+      } catch {
+        setAutoSaveStatus('error');
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [showModal, editingPage, formData.type, formData.richTextContent, contentDirty]);
+
   const handleDelete = (page: PageContent) => {
     Alert.alert(
       'Hapus Halaman',
@@ -250,7 +292,7 @@ export default function PagesManagement() {
               await deletePage(page.id);
               Alert.alert('Success', 'Halaman berhasil dihapus');
               loadPages();
-            } catch (error) {
+            } catch {
               Alert.alert('Error', 'Gagal menghapus halaman');
             }
           },
@@ -278,7 +320,7 @@ export default function PagesManagement() {
       }
       setShowModal(false);
       loadPages();
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Gagal menyimpan halaman');
     }
   };
@@ -463,57 +505,85 @@ export default function PagesManagement() {
                 {/* Type-specific fields */}
                 {formData.type === 'static' && (
                   <View style={styles.formGroup}>
-                    <Text style={styles.label}>Konten Halaman</Text>
-                    {Platform.OS === 'web' ? (
-                      // Fallback sederhana di web untuk menghindari error "window is not defined"
-                      <TextInput
-                        style={[styles.input, styles.textarea]}
-                        multiline
-                        numberOfLines={6}
+                    <View style={styles.richHeaderRow}>
+                      <Text style={styles.label}>Konten Halaman</Text>
+                      <View style={styles.richHeaderRight}>
+                        {editingPage && (
+                          <View style={styles.autoSavePill}>
+                            {autoSaveStatus === 'saving' ? (
+                              <>
+                                <ActivityIndicator size="small" color="#8B4513" />
+                                <Text style={styles.autoSaveText}>Menyimpan...</Text>
+                              </>
+                            ) : autoSaveStatus === 'saved' && autoSaveAt ? (
+                              <Text style={styles.autoSaveText}>
+                                Tersimpan {new Date(autoSaveAt).toLocaleTimeString()}
+                              </Text>
+                            ) : autoSaveStatus === 'error' ? (
+                              <Text style={styles.autoSaveText}>Gagal simpan</Text>
+                            ) : (
+                              <Text style={styles.autoSaveText}>Auto-save aktif</Text>
+                            )}
+                          </View>
+                        )}
+
+                        <View style={styles.modeSwitch}>
+                          <TouchableOpacity
+                            style={[
+                              styles.modeBtn,
+                              contentMode === 'edit' && styles.modeBtnActive,
+                            ]}
+                            onPress={() => setContentMode('edit')}
+                          >
+                            <Text
+                              style={[
+                                styles.modeBtnText,
+                                contentMode === 'edit' && styles.modeBtnTextActive,
+                              ]}
+                            >
+                              Edit
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[
+                              styles.modeBtn,
+                              contentMode === 'preview' && styles.modeBtnActive,
+                            ]}
+                            onPress={() => setContentMode('preview')}
+                          >
+                            <Text
+                              style={[
+                                styles.modeBtnText,
+                                contentMode === 'preview' && styles.modeBtnTextActive,
+                              ]}
+                            >
+                              Preview
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </View>
+
+                    {contentMode === 'edit' ? (
+                      <RichTextEditor
                         value={formData.richTextContent || ''}
-                        onChangeText={(text) =>
-                          setFormData({ ...formData, richTextContent: text })
-                        }
-                        placeholder="Tulis konten halaman di sini... (mode teks biasa di web)"
+                        onChange={(html: string) => {
+                          setFormData((prev) => ({ ...prev, richTextContent: html }));
+                          if (editingPage) setContentDirty(true);
+                        }}
+                        placeholder="Tulis konten halaman di sini..."
+                        minHeight={260}
                       />
                     ) : (
-                      <View style={styles.richEditorContainer}>
-                        {(() => {
-                          // Import runtime hanya di platform non-web
-                          const { RichEditor, RichToolbar, actions } =
-                            // eslint-disable-next-line @typescript-eslint/no-var-requires
-                            require('react-native-pell-rich-editor');
-
-                          return (
-                            <>
-                              <RichToolbar
-                                editor={richText}
-                                actions={[
-                                  actions.setBold,
-                                  actions.setItalic,
-                                  actions.setUnderline,
-                                  actions.heading1,
-                                  actions.heading2,
-                                  actions.insertBulletsList,
-                                  actions.insertOrderedList,
-                                  actions.insertLink,
-                                  actions.undo,
-                                  actions.redo,
-                                ]}
-                                style={styles.richToolbar}
-                              />
-                              <RichEditor
-                                ref={richText}
-                                initialContentHTML={formData.richTextContent || ''}
-                                onChange={(text: string) =>
-                                  setFormData({ ...formData, richTextContent: text })
-                                }
-                                placeholder="Tulis konten halaman di sini..."
-                                style={styles.richEditor}
-                              />
-                            </>
-                          );
-                        })()}
+                      <View style={styles.previewBox}>
+                        {Platform.OS === 'web' ? (
+                          <RichTextRenderer html={formData.richTextContent || ''} />
+                        ) : (
+                          <RichTextRenderer
+                            html={formData.richTextContent || ''}
+                            contentWidth={modalContentWidth}
+                          />
+                        )}
                       </View>
                     )}
                   </View>
@@ -559,7 +629,9 @@ export default function PagesManagement() {
                       <View style={styles.emptyVideoList}>
                         <Ionicons name="videocam-outline" size={48} color="#CCC" />
                         <Text style={styles.emptyVideoText}>Belum ada video</Text>
-                        <Text style={styles.emptyVideoSubtext}>Klik "Tambah Video" untuk menambahkan</Text>
+                        <Text style={styles.emptyVideoSubtext}>
+                          Klik {'"'}Tambah Video{'"'} untuk menambahkan
+                        </Text>
                       </View>
                     )}
                   </View>
@@ -1039,6 +1111,31 @@ const styles = StyleSheet.create({
     color: '#999',
     marginTop: 4,
   },
+  statusRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  statusChip: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    alignItems: 'center',
+  },
+  statusChipActive: {
+    backgroundColor: '#FFF5E0',
+    borderColor: '#8B4513',
+  },
+  statusChipText: {
+    fontSize: 13,
+    color: '#666',
+    fontWeight: '500',
+  },
+  statusChipTextActive: {
+    color: '#8B4513',
+    fontWeight: '700',
+  },
   typeSelector: {
     gap: 8,
   },
@@ -1226,5 +1323,64 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#5D4037',
+  },
+  richHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  richHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  autoSavePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#FFF8F0',
+    borderWidth: 1,
+    borderColor: '#E0D5C7',
+  },
+  autoSaveText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#5D4037',
+  },
+  modeSwitch: {
+    flexDirection: 'row',
+    borderRadius: 999,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#E0D5C7',
+    backgroundColor: '#FFF',
+  },
+  modeBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#FFF',
+  },
+  modeBtnActive: {
+    backgroundColor: '#FFF5E0',
+  },
+  modeBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#666',
+  },
+  modeBtnTextActive: {
+    color: '#5D4037',
+  },
+  previewBox: {
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: '#FFF',
+    padding: 12,
   },
 });
