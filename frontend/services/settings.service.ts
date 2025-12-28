@@ -4,7 +4,6 @@ import { db } from '../config/firebase';
 export interface AppSettings {
   appName: string;
   parokiName: string;
-  headerText: string;
   footerText: string;
   logoBase64?: string;
   iconBase64?: string;
@@ -65,7 +64,6 @@ export const initializeDefaultSettings = async () => {
       const defaultSettings: AppSettings = {
         appName: 'Paroki Tomang',
         parokiName: 'Paroki Santa Maria Bunda Karmel (MBK)',
-        headerText: 'Paroki Tomang',
         footerText: 'Paroki Santa Maria Bunda Karmel (MBK)\nTomang - Jakarta Barat',
         primaryColor: '#8B4513',
         secondaryColor: '#D2691E',

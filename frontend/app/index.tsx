@@ -286,9 +286,9 @@ export default function Index() {
     });
   }, [logout]);
 
-  // Simplified avatar press handler
-  const handleAvatarPress = useCallback(() => {
-    console.log('[Home] Avatar clicked, user:', user?.email || 'none');
+  // Auth button press handler (login/logout)
+  const handleAuthPress = useCallback(() => {
+    console.log('[Home] Auth button clicked, user:', user?.email || 'none');
     
     if (user) {
       console.log('[Home] User is logged in, calling testLogout');
@@ -356,8 +356,6 @@ export default function Index() {
   }
 
   const primaryColor = appSettings?.primaryColor || '#8B4513';
-  const headerTitle =
-    appSettings?.headerText || appSettings?.parokiName || 'Paroki Santa Maria Bunda Karmel';
   const heroTitle = `Selamat Datang di ${appSettings?.appName || 'Paroki Tomang'}`;
   const footerLines = (appSettings?.footerText || 'Paroki Santa Maria Bunda Karmel (MBK)\nTomang - Jakarta Barat')
     .split('\n')
@@ -374,37 +372,13 @@ export default function Index() {
         <View style={styles.topBar}>
           <View style={styles.topBarRow}>
             <Ionicons name="location-outline" size={16} color="#FFF5E0" />
-            <Text style={styles.topBarTitle} numberOfLines={1}>
-              {headerTitle}
-            </Text>
           </View>
-          <TouchableOpacity 
-            style={[styles.avatar, isLoggingOut && styles.avatarLoading]} 
-            onPress={handleAvatarPress}
-            onPressIn={() => console.log('[Home] Avatar pressed in')}
-            onPressOut={() => console.log('[Home] Avatar pressed out')}
-            disabled={isLoggingOut}
-          >
-            {isLoggingOut ? (
-              <ActivityIndicator size="small" color={primaryColor} />
-            ) : (
-              <Ionicons 
-                name={user ? "log-out-outline" : "person"} 
-                size={20} 
-                color={primaryColor} 
-              />
-            )}
-          </TouchableOpacity>
         </View>
 
         {/* Hero card ala modern app */}
         <View style={[styles.heroCard, { backgroundColor: primaryColor }]}>
           <View style={styles.heroLeft}>
-            <Text style={styles.heroChip}>Hari Ini</Text>
             <Text style={styles.heroMainTitle}>{heroTitle}</Text>
-            <Text style={styles.heroMainSubtitle}>
-              Temukan jadwal misa, pelayanan gereja, renungan harian, dan informasi penting lain.
-            </Text>
             
             <View style={styles.heroStatsRow}>
               {effectiveMassHero.targetType === 'none' ? (
@@ -522,6 +496,31 @@ export default function Index() {
             <Text style={styles.footerSubtext}>{footerLines.slice(2).join(' ')}</Text>
           )}
         </View>
+
+        {/* Login/Logout Button */}
+        <View style={styles.authButtonContainer}>
+          <TouchableOpacity 
+            style={[
+              styles.authButton, 
+              { backgroundColor: '#FFF8F0' }, // Same as home page background
+              isLoggingOut && styles.authButtonLoading
+            ]} 
+            onPress={handleAuthPress}
+            onPressIn={() => console.log('[Home] Auth button pressed in')}
+            onPressOut={() => console.log('[Home] Auth button pressed out')}
+            disabled={isLoggingOut}
+          >
+            {isLoggingOut ? (
+              <ActivityIndicator size="small" color={primaryColor} />
+            ) : (
+              <Ionicons 
+                name={user ? "log-out-outline" : "person"} 
+                size={24} 
+                color={primaryColor} 
+              />
+            )}
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -536,8 +535,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 32,
-    paddingTop: 24,
+    paddingBottom: 5,
+    paddingTop: 5,
     paddingHorizontal: 16,
   },
   topBar: {
@@ -557,27 +556,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 4,
     gap: 4,
-  },
-  topBarTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#5D4037',
-  },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#FFE4C4',
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  avatarLoading: {
-    opacity: 0.6,
   },
   loadingContainer: {
     flex: 1,
@@ -607,26 +585,10 @@ const styles = StyleSheet.create({
   heroLeft: {
     flex: 1,
   },
-  heroChip: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    color: '#FFF5E0',
-    fontSize: 12,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
   heroMainTitle: {
     fontSize: 18,
     fontWeight: '800',
     color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  heroMainSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.9)',
     marginBottom: 14,
   },
   heroStatsRow: {
@@ -834,5 +796,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#FFE4C4',
     textAlign: 'center',
+  },
+  authButtonContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 5,
+    alignItems: 'center',
+  },
+  authButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+  },
+  authButtonLoading: {
+    opacity: 0.7,
   },
 });

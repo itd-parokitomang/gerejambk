@@ -29,7 +29,6 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<AppSettings>({
     appName: '',
     parokiName: '',
-    headerText: '',
     footerText: '',
     primaryColor: '#8B4513',
     secondaryColor: '#D2691E',
@@ -154,16 +153,6 @@ export default function SettingsPage() {
             value={settings.parokiName}
             onChangeText={(text) => setSettings({ ...settings, parokiName: text })}
             placeholder="Contoh: Paroki Santa Maria Bunda Karmel"
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Text Header</Text>
-          <TextInput
-            style={styles.input}
-            value={settings.headerText}
-            onChangeText={(text) => setSettings({ ...settings, headerText: text })}
-            placeholder="Text yang muncul di header"
           />
         </View>
 
