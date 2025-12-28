@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { registerPublicAdmin } from '../services/auth.service';
 import { useAuth } from '../contexts/AuthContext';
 
-export default function RegisterAdmin() {
+export default function RegisterUser() {
   const router = useRouter();
   const { user, profile } = useAuth();
 
@@ -30,13 +30,22 @@ export default function RegisterAdmin() {
 
   useEffect(() => {
     if (user && profile) {
-      router.replace('/adm/dashboard');
+      // Redirect based on user role
+      if (profile.role === 'admin' || profile.role === 'superadmin') {
+        router.replace('/adm/dashboard');
+      } else {
+        router.replace('/'); // Redirect regular users to home page
+      }
     }
   }, [user, profile, router]);
 
   const handleRegister = async () => {
     const trimmedName = displayName.trim();
     const trimmedEmail = email.trim();
+
+    console.log('[Register] Starting registration process...');
+    console.log('[Register] Name:', trimmedName);
+    console.log('[Register] Email:', trimmedEmail);
 
     if (!trimmedName || !trimmedEmail || !password || !confirmPassword) {
       Alert.alert('Error', 'Mohon lengkapi semua field');
@@ -50,8 +59,11 @@ export default function RegisterAdmin() {
 
     setLoading(true);
     try {
-      await registerPublicAdmin(trimmedEmail, password, trimmedName);
+      console.log('[Register] Calling registerPublicAdmin...');
+      const result = await registerPublicAdmin(trimmedEmail, password, trimmedName);
+      console.log('[Register] Registration successful:', result);
     } catch (error: any) {
+      console.error('[Register] Registration failed:', error);
       Alert.alert('Registrasi Gagal', error?.message || 'Terjadi kesalahan');
     } finally {
       setLoading(false);
@@ -69,7 +81,7 @@ export default function RegisterAdmin() {
             <View style={styles.iconContainer}>
               <Ionicons name="person-add" size={64} color="#8B4513" />
             </View>
-            <Text style={styles.title}>Registrasi Admin</Text>
+            <Text style={styles.title}>Registrasi User</Text>
             <Text style={styles.subtitle}>Paroki Tomang</Text>
           </View>
 

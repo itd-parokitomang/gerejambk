@@ -20,14 +20,19 @@ export default function AdminLogin() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const { login, user } = useAuth();
+  const { login, user, profile } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (user) {
-      router.replace('/adm/dashboard');
+    if (user && profile) {
+      // Redirect based on user role
+      if (profile.role === 'admin' || profile.role === 'superadmin') {
+        router.replace('/adm/dashboard');
+      } else {
+        router.replace('/'); // Redirect regular users to home page
+      }
     }
-  }, [user, router]);
+  }, [user, profile, router]);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -38,7 +43,7 @@ export default function AdminLogin() {
     setLoading(true);
     try {
       await login(email, password);
-      router.replace('/adm/dashboard');
+      // Redirect will be handled by useEffect based on user role
     } catch (error: any) {
       Alert.alert('Login Gagal', error.message || 'Email atau password salah');
     } finally {

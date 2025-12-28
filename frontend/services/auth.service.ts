@@ -19,7 +19,7 @@ export interface UserProfile {
   uid: string;
   email: string;
   displayName?: string;
-  role: 'superadmin' | 'admin';
+  role: 'superadmin' | 'admin' | 'user';
   createdAt: any;
   updatedAt: any;
 }
@@ -102,38 +102,76 @@ export const registerPublicAdmin = async (
 ) => {
   let createdUser: User | null = null;
   try {
+    console.log('[registerPublicAdmin] Starting registration for:', email);
+    
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
     createdUser = user;
+    
+    console.log('[registerPublicAdmin] User created successfully:', user.uid);
 
     await updateProfile(user, { displayName });
+    console.log('[registerPublicAdmin] Profile updated with displayName:', displayName);
 
     const userProfile: UserProfile = {
       uid: user.uid,
       email: user.email!,
       displayName,
-      role: 'admin',
+      role: 'user',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
 
+    console.log('[registerPublicAdmin] Creating user profile in Firestore...');
     await setDoc(doc(db, 'users', user.uid), userProfile);
+    console.log('[registerPublicAdmin] User profile created successfully');
+    
     return { user, profile: userProfile };
   } catch (error: any) {
+    console.error('[registerPublicAdmin] Error during registration:', error);
+    
     if (createdUser) {
       try {
+        console.log('[registerPublicAdmin] Cleaning up created user...');
         await deleteUser(createdUser);
-      } catch {
-        await Promise.resolve();
+        console.log('[registerPublicAdmin] User cleanup successful');
+      } catch (cleanupError) {
+        console.error('[registerPublicAdmin] Error during cleanup:', cleanupError);
       }
     }
     throw new Error(error.message);
   }
 };
 
-// Logout
 export const logoutUser = async () => {
-  await signOut(auth);
+  try {
+    console.log('[Auth Service] Signing out user...');
+    console.log('[Auth Service] Current auth user:', auth.currentUser?.email);
+    
+    if (!auth.currentUser) {
+      console.log('[Auth Service] No user currently signed in');
+      return;
+    }
+    
+    await signOut(auth);
+    console.log('[Auth Service] User signed out successfully');
+    console.log('[Auth Service] Auth user after signout:', auth.currentUser);
+  } catch (error) {
+    console.error('[Auth Service] Sign out error:', error);
+    throw error;
+  }
+};
+
+// Force logout on app start (optional)
+export const clearAuthOnStart = async () => {
+  try {
+    if (auth.currentUser) {
+      console.log('[Auth Service] Clearing auth state on app start');
+      await signOut(auth);
+    }
+  } catch (error) {
+    console.error('[Auth Service] Error clearing auth on start:', error);
+  }
 };
 
 // Get current user profile

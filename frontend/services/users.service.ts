@@ -47,7 +47,7 @@ export const getUserByUid = async (uid: string): Promise<UserProfile | null> => 
 };
 
 // Update user role (only superadmin can change roles)
-export const updateUserRole = async (uid: string, role: 'admin' | 'superadmin') => {
+export const updateUserRole = async (uid: string, role: 'admin' | 'superadmin' | 'user') => {
   try {
     const userRef = doc(db, USERS_COLLECTION, uid);
     await updateDoc(userRef, { role });

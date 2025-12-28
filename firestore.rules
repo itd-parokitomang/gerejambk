@@ -12,6 +12,12 @@ service cloud.firestore {
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'superadmin'];
     }
     
+    function isUser() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'superadmin', 'user'];
+    }
+    
     function isSuperAdmin() {
       return isAuthenticated() && 
              exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
@@ -61,7 +67,7 @@ service cloud.firestore {
         ) || (
           isAuthenticated() &&
           request.auth.uid == userId &&
-          request.resource.data.role == 'admin'
+          request.resource.data.role in ['admin', 'user']
         )
       ) && (
         request.resource.data.uid == userId &&

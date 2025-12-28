@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   FlatList,
   Image,
   useWindowDimensions,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, type Href } from 'expo-router';
@@ -25,6 +27,7 @@ import {
   getMassScheduleHeroConfig,
   MassScheduleHeroConfig,
 } from '../services/settings.service';
+import { useAuth } from '../contexts/AuthContext';
 
 // Default fallback jika collection sliders kosong
 const DEFAULT_INFO_SLIDES: SliderItem[] = [
@@ -113,45 +116,123 @@ const DEFAULT_MENU_ITEMS = [
 export default function Index() {
   const router = useRouter();
   const { width: windowWidth } = useWindowDimensions();
+  const { user, logout, loading } = useAuth();
   const [sliders, setSliders] = useState<SliderItem[]>([]);
   const [pages, setPages] = useState<PageContent[]>([]);
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [massScheduleHero, setMassScheduleHero] = useState<MassScheduleHeroConfig | null>(null);
   const [customIcons, setCustomIcons] = useState<Record<string, string>>({});
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  // Debug user state changes - simplified
+  useEffect(() => {
+    console.log('[Home] User changed:', user?.email || 'logged out');
+    console.log('[Home] Icon should show:', user ? 'logout icon' : 'person icon');
+  }, [user]);
 
   useEffect(() => {
     const load = async () => {
-      const data = await getActiveSliders();
-      setSliders(data);
+      console.log('[Home] Loading sliders, user status:', user ? 'logged in' : 'logged out');
+      
+      // Always try to load from Firestore, regardless of user status
+      try {
+        const data = await getActiveSliders();
+        if (data && data.length > 0) {
+          setSliders(data);
+          console.log('[Home] Loaded sliders from Firestore:', data.length);
+        } else {
+          // Only use default if no data from Firestore
+          console.log('[Home] No sliders from Firestore, using defaults');
+          setSliders(DEFAULT_INFO_SLIDES);
+        }
+      } catch (error) {
+        console.error('[Home] Error loading sliders:', error);
+        // Keep existing sliders if error, don't reset to default
+        if (sliders.length === 0) {
+          setSliders(DEFAULT_INFO_SLIDES);
+        }
+      }
     };
-    load();
-  }, []);
+    
+    // Only load on initial mount, not on user changes
+    if (sliders.length === 0) {
+      load();
+    }
+  }, []); // Remove user dependency
+
+  // Separate effect for user changes - don't reload sliders
+  useEffect(() => {
+    console.log('[Home] User changed:', user?.email || 'logged out');
+    console.log('[Home] Current sliders count:', sliders.length);
+  }, [user]);
 
   useEffect(() => {
     const loadPages = async () => {
-      const data = await getActivePages();
-      setPages(data);
+      if (user) {
+        // User logged in, load data from Firestore
+        try {
+          const data = await getActivePages();
+          setPages(data);
+        } catch (error) {
+          console.error('[Home] Error loading pages:', error);
+          setPages(DEFAULT_MENU_ITEMS);
+        }
+      } else {
+        // User logged out, use default data
+        setPages(DEFAULT_MENU_ITEMS);
+      }
     };
     loadPages();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     const loadSettings = async () => {
-      const data = await getAppSettings();
-      setAppSettings(data);
+      if (user) {
+        // User logged in, load settings from Firestore
+        try {
+          const data = await getAppSettings();
+          setAppSettings(data);
+        } catch (error) {
+          console.error('[Home] Error loading settings:', error);
+          setAppSettings(null);
+        }
+      } else {
+        // User logged out, clear settings
+        setAppSettings(null);
+      }
     };
     loadSettings();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     const loadHero = async () => {
-      const data = await getMassScheduleHeroConfig();
-      setMassScheduleHero(data);
+      if (user) {
+        // User logged in, load hero config from Firestore
+        try {
+          const data = await getMassScheduleHeroConfig();
+          setMassScheduleHero(data);
+        } catch (error) {
+          console.error('[Home] Error loading hero config:', error);
+          setMassScheduleHero(null);
+        }
+      } else {
+        // User logged out, clear hero config
+        setMassScheduleHero(null);
+      }
     };
     loadHero();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
+    if (!user) {
+      // User logged out, clear custom icons
+      setCustomIcons({});
+      return;
+    }
+
+    // Only proceed if we have pages and sliders data
+    if (pages.length === 0 && sliders.length === 0) return;
+
     const ids = new Set<string>();
     for (const p of pages) {
       if (p.icon && isCustomIconRef(p.icon)) ids.add(getCustomIconId(p.icon));
@@ -160,8 +241,11 @@ export default function Index() {
       const icon = (s as any).icon as string | undefined;
       if (icon && isCustomIconRef(icon)) ids.add(getCustomIconId(icon));
     }
+    
+    // Only fetch missing icons
     const missing = Array.from(ids).filter((id) => !customIcons[id]);
     if (missing.length === 0) return;
+    
     let cancelled = false;
     Promise.all(missing.map((id) => getCustomIconById(id))).then((docs) => {
       if (cancelled) return;
@@ -176,16 +260,8 @@ export default function Index() {
     return () => {
       cancelled = true;
     };
-  }, [customIcons, pages, sliders]);
+  }, [pages, sliders, user]); // Keep dependencies minimal
 
-  const primaryColor = appSettings?.primaryColor || '#8B4513';
-  const headerTitle =
-    appSettings?.headerText || appSettings?.parokiName || 'Paroki Santa Maria Bunda Karmel';
-  const heroTitle = `Selamat Datang di ${appSettings?.appName || 'Paroki Tomang'}`;
-  const footerLines = (appSettings?.footerText || 'Paroki Santa Maria Bunda Karmel (MBK)\nTomang - Jakarta Barat')
-    .split('\n')
-    .filter((line) => line.trim().length > 0);
-  
   // Calculate number of columns based on current window width
   const numColumns = windowWidth >= 1024 ? 5 : windowWidth >= 768 ? 4 : 3;
   
@@ -196,15 +272,34 @@ export default function Index() {
   const itemWidth =
     (availableWidth / numColumns) - (menuItemHorizontalMargin * 2);
 
-  const handleMenuPress = (route: Href) => {
+  const handleMenuPress = useCallback((route: Href) => {
     router.push(route);
-  };
+  }, [router]);
 
-  const handleAvatarPress = () => {
-    router.push('/adm' as Href);
-  };
+  // Test logout function directly
+  const testLogout = useCallback(() => {
+    console.log('[Home] testLogout called directly');
+    logout().then(() => {
+      console.log('[Home] testLogout success');
+    }).catch((error) => {
+      console.error('[Home] testLogout error:', error);
+    });
+  }, [logout]);
 
-  const handleSliderPress = (item: SliderItem) => {
+  // Simplified avatar press handler
+  const handleAvatarPress = useCallback(() => {
+    console.log('[Home] Avatar clicked, user:', user?.email || 'none');
+    
+    if (user) {
+      console.log('[Home] User is logged in, calling testLogout');
+      testLogout();
+    } else {
+      console.log('[Home] User not logged in, going to login');
+      router.push('/adm' as Href);
+    }
+  }, [user, testLogout, router]);
+
+  const handleSliderPress = useCallback((item: SliderItem) => {
     if (item.targetType === 'page' && item.targetPageSlug) {
       router.push(`/pages/${item.targetPageSlug}` as Href);
       return;
@@ -220,7 +315,7 @@ export default function Index() {
       const encodedTitle = encodeURIComponent(item.title || 'Tautan');
       router.push(`/slider-webview?url=${encodedUrl}&title=${encodedTitle}` as Href);
     }
-  };
+  }, [router]);
 
   const effectiveMassHero: MassScheduleHeroConfig = massScheduleHero || {
     title: 'Jadwal Misa',
@@ -230,7 +325,7 @@ export default function Index() {
     updatedAt: null as any,
   };
 
-  const handleMassHeroPress = () => {
+  const handleMassHeroPress = useCallback(() => {
     const cfg = effectiveMassHero;
     if (cfg.targetType === 'page' && cfg.targetPageSlug) {
       router.push(`/pages/${cfg.targetPageSlug}` as Href);
@@ -246,7 +341,27 @@ export default function Index() {
       const encodedTitle = encodeURIComponent(cfg.title || 'Tautan');
       router.push(`/slider-webview?url=${encodedUrl}&title=${encodedTitle}` as Href);
     }
-  };
+  }, [effectiveMassHero, router]);
+
+  // Don't render anything while auth is loading
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#8B4513" />
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const primaryColor = appSettings?.primaryColor || '#8B4513';
+  const headerTitle =
+    appSettings?.headerText || appSettings?.parokiName || 'Paroki Santa Maria Bunda Karmel';
+  const heroTitle = `Selamat Datang di ${appSettings?.appName || 'Paroki Tomang'}`;
+  const footerLines = (appSettings?.footerText || 'Paroki Santa Maria Bunda Karmel (MBK)\nTomang - Jakarta Barat')
+    .split('\n')
+    .filter((line) => line.trim().length > 0);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -263,8 +378,22 @@ export default function Index() {
               {headerTitle}
             </Text>
           </View>
-          <TouchableOpacity style={styles.avatar} onPress={handleAvatarPress}>
-            <Ionicons name="person" size={20} color={primaryColor} />
+          <TouchableOpacity 
+            style={[styles.avatar, isLoggingOut && styles.avatarLoading]} 
+            onPress={handleAvatarPress}
+            onPressIn={() => console.log('[Home] Avatar pressed in')}
+            onPressOut={() => console.log('[Home] Avatar pressed out')}
+            disabled={isLoggingOut}
+          >
+            {isLoggingOut ? (
+              <ActivityIndicator size="small" color={primaryColor} />
+            ) : (
+              <Ionicons 
+                name={user ? "log-out-outline" : "person"} 
+                size={20} 
+                color={primaryColor} 
+              />
+            )}
           </TouchableOpacity>
         </View>
 
@@ -276,6 +405,7 @@ export default function Index() {
             <Text style={styles.heroMainSubtitle}>
               Temukan jadwal misa, pelayanan gereja, renungan harian, dan informasi penting lain.
             </Text>
+            
             <View style={styles.heroStatsRow}>
               {effectiveMassHero.targetType === 'none' ? (
                 <View style={styles.heroStat}>
@@ -318,7 +448,7 @@ export default function Index() {
                   accessibilityRole="button"
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  {hasImage ? (
+                  {hasImage && imageUri ? (
                     <Image
                       source={{ uri: imageUri }}
                       style={styles.infoSlideImageBackground}
@@ -440,6 +570,31 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFE4C4',
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  avatarLoading: {
+    opacity: 0.6,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#8B4513',
+  },
+  debugIconText: {
+    position: 'absolute',
+    bottom: -12,
+    fontSize: 8,
+    color: '#999',
+    fontWeight: 'bold',
   },
   heroCard: {
     backgroundColor: '#8B4513',

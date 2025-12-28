@@ -4,7 +4,8 @@ import {
   loginUser, 
   logoutUser, 
   onAuthChange,
-  getCurrentUserProfile
+  getCurrentUserProfile,
+  clearAuthOnStart
 } from '../services/auth.service';
 import { initializeDefaultSettings } from '../services/settings.service';
 import { initializeDefaultPages } from '../services/pages.service';
@@ -25,16 +26,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const didBootstrapRef = useRef(false);
+  const didClearAuthRef = useRef(false);
 
   useEffect(() => {
+    // Clear auth on app start (force logout on every app start)
+    const clearAuthIfNeeded = async () => {
+      if (!didClearAuthRef.current) {
+        didClearAuthRef.current = true;
+        // Force logout on app start - uncomment if you want this behavior
+        await clearAuthOnStart();
+      }
+    };
+    clearAuthIfNeeded();
+
     // Listen to auth state changes
     const unsubscribe = onAuthChange(async (firebaseUser) => {
+      console.log('[AuthContext] Auth state changed:', firebaseUser ? `User: ${firebaseUser.email}` : 'User logged out');
+      
       setUser(firebaseUser);
       
       if (firebaseUser) {
         // Get user profile from Firestore
         const userProfile = await getCurrentUserProfile(firebaseUser.uid);
         setProfile(userProfile);
+        console.log('[AuthContext] User profile loaded:', userProfile?.role);
 
         if (
           userProfile &&
@@ -46,6 +61,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await initializeDefaultPages();
         }
       } else {
+        console.log('[AuthContext] Clearing user profile and bootstrap flag');
         setProfile(null);
         didBootstrapRef.current = false;
       }
@@ -67,9 +83,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
-    await logoutUser();
-    setUser(null);
-    setProfile(null);
+    try {
+      console.log('[AuthContext] Starting logout process...');
+      
+      // Sign out from Firebase first (this will trigger onAuthChange)
+      await logoutUser();
+      
+      console.log('[AuthContext] Firebase signOut completed');
+      console.log('[AuthContext] Logout completed successfully');
+    } catch (error) {
+      console.error('[AuthContext] Logout error:', error);
+      // If Firebase logout fails, manually clear local state
+      setUser(null);
+      setProfile(null);
+      didBootstrapRef.current = false;
+      throw error;
+    }
   };
 
   return (

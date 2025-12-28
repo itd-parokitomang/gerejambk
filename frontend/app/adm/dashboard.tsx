@@ -66,6 +66,11 @@ export default function AdminDashboard() {
     );
   }
 
+  // Redirect regular users to home page
+  if (profile.role === 'user') {
+    return <Redirect href="/" />;
+  }
+
   const renderContent = () => {
     switch (activePage) {
       case 'overview':
