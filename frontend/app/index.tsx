@@ -344,14 +344,6 @@ export default function Index() {
                         {item.title}
                       </Text>
                     </View>
-                    {!!item.description && (
-                      <Text
-                        style={styles.infoSlideDescription}
-                        numberOfLines={2}
-                      >
-                        {item.description}
-                      </Text>
-                    )}
                   </View>
                 </TouchableOpacity>
               );
