@@ -63,8 +63,7 @@ export const initializeDefaultSettings = async () => {
     if (!settingsDoc.exists()) {
       const defaultSettings: AppSettings = {
         appName: 'Paroki Tomang',
-        parokiName: 'Paroki Santa Maria Bunda Karmel (MBK)',
-        footerText: 'Paroki Santa Maria Bunda Karmel (MBK)\nTomang - Jakarta Barat',
+        footerText: 'Paroki Tomang - Gereja Maria Bunda Karmel',
         primaryColor: '#8B4513',
         secondaryColor: '#D2691E',
         updatedAt: serverTimestamp()

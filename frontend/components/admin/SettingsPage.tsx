@@ -28,7 +28,6 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<AppSettings>({
     appName: '',
-    parokiName: '',
     footerText: '',
     primaryColor: '#8B4513',
     secondaryColor: '#D2691E',
@@ -94,8 +93,8 @@ export default function SettingsPage() {
   };
 
   const handleSave = async () => {
-    if (!settings.appName || !settings.parokiName) {
-      Alert.alert('Error', 'Nama aplikasi dan nama paroki wajib diisi');
+    if (!settings.appName) {
+      Alert.alert('Error', 'Nama aplikasi wajib diisi');
       return;
     }
 
@@ -143,16 +142,6 @@ export default function SettingsPage() {
             value={settings.appName}
             onChangeText={(text) => setSettings({ ...settings, appName: text })}
             placeholder="Contoh: Paroki Tomang"
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Nama Paroki *</Text>
-          <TextInput
-            style={styles.input}
-            value={settings.parokiName}
-            onChangeText={(text) => setSettings({ ...settings, parokiName: text })}
-            placeholder="Contoh: Paroki Santa Maria Bunda Karmel"
           />
         </View>
 
@@ -261,21 +250,6 @@ export default function SettingsPage() {
         <Text style={styles.sectionDesc}>
           Atur kartu ringkas “Jadwal Misa / Lihat” di bagian hero beranda.
         </Text>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Judul</Text>
-          <TextInput
-            style={styles.input}
-            value={massScheduleHero.title}
-            onChangeText={(text) =>
-              setMassScheduleHero((prev) => ({
-                ...prev,
-                title: text,
-              }))
-            }
-            placeholder="Contoh: Jadwal Misa"
-          />
-        </View>
 
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Nilai</Text>

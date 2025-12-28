@@ -357,7 +357,7 @@ export default function Index() {
 
   const primaryColor = appSettings?.primaryColor || '#8B4513';
   const heroTitle = `Selamat Datang di ${appSettings?.appName || 'Paroki Tomang'}`;
-  const footerLines = (appSettings?.footerText || 'Paroki Santa Maria Bunda Karmel (MBK)\nTomang - Jakarta Barat')
+  const footerLines = (appSettings?.footerText || 'Paroki Tomang - Gereja Maria Bunda Karmel')
     .split('\n')
     .filter((line) => line.trim().length > 0);
 
@@ -383,12 +383,10 @@ export default function Index() {
             <View style={styles.heroStatsRow}>
               {effectiveMassHero.targetType === 'none' ? (
                 <View style={styles.heroStat}>
-                  <Text style={styles.heroStatLabel}>{effectiveMassHero.title}</Text>
                   <Text style={styles.heroStatValue}>{effectiveMassHero.value}</Text>
                 </View>
               ) : (
                 <TouchableOpacity style={styles.heroStat} activeOpacity={0.8} onPress={handleMassHeroPress}>
-                  <Text style={styles.heroStatLabel}>{effectiveMassHero.title}</Text>
                   <Text style={styles.heroStatValue}>{effectiveMassHero.value}</Text>
                 </TouchableOpacity>
               )}
@@ -490,7 +488,7 @@ export default function Index() {
 
         {/* Footer Info */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>{footerLines[0] || 'Paroki Santa Maria Bunda Karmel (MBK)'}</Text>
+          <Text style={styles.footerText}>{footerLines[0] || 'Paroki Tomang - Gereja Maria Bunda Karmel'}</Text>
           {!!footerLines[1] && <Text style={styles.footerSubtext}>{footerLines[1]}</Text>}
           {footerLines.length > 2 && (
             <Text style={styles.footerSubtext}>{footerLines.slice(2).join(' ')}</Text>
@@ -576,7 +574,7 @@ const styles = StyleSheet.create({
   },
   heroCard: {
     backgroundColor: '#8B4513',
-    borderRadius: 24,
+    borderRadius: 12,
     paddingHorizontal: 18,
     paddingVertical: 16,
     marginBottom: 20,
@@ -596,7 +594,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 6,
     paddingHorizontal: 10,
-    borderRadius: 16,
+    borderRadius: 8,
     backgroundColor: 'rgba(255,255,255,0.12)',
   },
   heroStat: {
@@ -674,7 +672,7 @@ const styles = StyleSheet.create({
     width: 240,
     height: 150,
     marginRight: 12,
-    borderRadius: 22,
+    borderRadius: 11,
     overflow: 'hidden',
     position: 'relative',
     shadowColor: '#000',
@@ -711,7 +709,7 @@ const styles = StyleSheet.create({
     left: 8,
     right: 8,
     bottom: 8,
-    borderRadius: 16,
+    borderRadius: 8,
     backgroundColor: 'rgba(255,255,255,0.96)',
     paddingHorizontal: 12,
     paddingVertical: 8,

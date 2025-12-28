@@ -705,7 +705,7 @@ const styles = StyleSheet.create({
   cardIconWrapper: {
     width: 42,
     height: 42,
-    borderRadius: 21,
+    borderRadius: 3,
     backgroundColor: '#FFF5E0',
     justifyContent: 'center',
     alignItems: 'center',
@@ -713,7 +713,7 @@ const styles = StyleSheet.create({
   cardImage: {
     width: 42,
     height: 42,
-    borderRadius: 21,
+    borderRadius: 3,
   },
   cardTextBlock: {
     flex: 1,
@@ -907,7 +907,7 @@ const styles = StyleSheet.create({
   iconPreviewCircle: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 3,
     backgroundColor: '#FFF5E0',
     justifyContent: 'center',
     alignItems: 'center',
